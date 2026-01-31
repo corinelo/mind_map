@@ -2,7 +2,7 @@ let currentProjectId = null;
 let mapData = {};
 let inboxData = [];
 
-// --- プロジェクト管理 (リスト表示版) ---
+// --- プロジェクト管理 ---
 async function loadProjects() {
     try {
         const res = await fetch('/api/projects');
@@ -11,6 +11,7 @@ async function loadProjects() {
         const listEl = document.getElementById('project-list');
         listEl.innerHTML = '';
         
+        // リスト描画
         projects.forEach(p => {
             const li = document.createElement('li');
             li.className = `project-item ${p.id == currentProjectId ? 'active' : ''}`;
@@ -24,21 +25,22 @@ async function loadProjects() {
             listEl.appendChild(li);
         });
 
-        // 初回ロード時
-        if (projects.length > 0 && !currentProjectId) {
-            switchProject(projects[0].id);
-        } else if (currentProjectId) {
-            // アクティブ表示の更新だけ
-            Array.from(listEl.children).forEach((li, index) => {
-                if(projects[index].id == currentProjectId) li.classList.add('active');
-                else li.classList.remove('active');
-            });
+        // 【修正】: まだプロジェクトが選ばれていない場合、強制的に先頭を選ぶ
+        if (projects.length > 0) {
+            if (!currentProjectId) {
+                console.log("Auto-selecting first project:", projects[0].id);
+                switchProject(projects[0].id);
+            }
+        } else {
+            // 万が一プロジェクトが0個なら、作成を促すか自動作成する
+            console.warn("No projects found.");
         }
-    } catch(e) { console.error(e); }
+
+    } catch(e) { console.error("Project Load Error:", e); }
 }
 
 async function createProject() {
-    const name = prompt("新しいプロジェクト名を入力:");
+    const name = prompt("新しいプロジェクト名:");
     if(!name) return;
     
     await fetch('/api/projects', {
@@ -49,16 +51,15 @@ async function createProject() {
     // 最新のを取得して切り替え
     const res = await fetch('/api/projects');
     const projects = await res.json();
-    currentProjectId = projects[projects.length-1].id;
-    loadProjects();
+    const newId = projects[projects.length-1].id;
+    switchProject(newId);
     
-    // スマホならサイドバーを閉じる
     document.getElementById('project-sidebar').classList.remove('active');
 }
 
 async function deleteProject(event, id) {
-    event.stopPropagation(); // 親のクリックイベントを止める
-    if(!confirm("プロジェクトを削除しますか？")) return;
+    event.stopPropagation();
+    if(!confirm("削除しますか？")) return;
     
     await fetch(`/api/projects?id=${id}`, { method: 'DELETE' });
     if(currentProjectId == id) currentProjectId = null;
@@ -67,22 +68,47 @@ async function deleteProject(event, id) {
 
 function switchProject(id) {
     currentProjectId = id;
+    console.log("Switched to project:", id);
     loadData(id);
-    loadProjects(); // アクティブ表示更新
-    // スマホならサイドバーを閉じる
+    // UI更新（再描画せずクラス付替だけで軽量化）
+    const listEl = document.getElementById('project-list');
+    Array.from(listEl.children).forEach((li, index) => {
+       // インデックスとIDのマッチングは簡易的なため、loadProjectsを再呼出するのが確実
+    });
+    loadProjects(); 
     document.getElementById('project-sidebar').classList.remove('active');
 }
 
-// --- サイドバー開閉ロジック ---
-function toggleProjectSidebar() {
-    const sb = document.getElementById('project-sidebar');
-    sb.classList.toggle('active');
+// --- データ保存 ---
+async function saveToInbox(text) {
+    // 【修正】プロジェクトIDがない場合のガード
+    if(!currentProjectId) {
+        alert("プロジェクトが読み込まれていません。リロードしてください。");
+        return;
+    }
+    if(!text) return;
+
+    try {
+        await fetch('/api/inbox', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text: text, project_id: currentProjectId })
+        });
+        loadData(currentProjectId);
+        document.getElementById('manual-input').value = '';
+    } catch(e) {
+        console.error("Save Error:", e);
+        alert("保存に失敗しました");
+    }
 }
 
+// --- 以下、既存ロジック ---
+
+// サイドバー開閉
+function toggleProjectSidebar() { document.getElementById('project-sidebar').classList.toggle('active'); }
 function toggleInboxSidebar() {
     const inbox = document.getElementById('inbox-sidebar');
     const openBtn = document.getElementById('open-inbox-btn');
-    
     if (inbox.style.display === 'none') {
         inbox.style.display = 'flex';
         openBtn.style.display = 'none';
@@ -92,7 +118,7 @@ function toggleInboxSidebar() {
     }
 }
 
-// --- 既存データ処理 ---
+// データロード
 async function loadData(projectId) {
     if(!projectId) return;
     try {
@@ -100,9 +126,7 @@ async function loadData(projectId) {
         const data = await res.json();
         mapData = data.map;
         inboxData = data.inbox;
-        
         renderInbox();
-        // マップエリアが表示されている時のみ描画
         const mapSvg = document.getElementById('mindmap-svg');
         if(mapSvg.parentElement.style.display !== 'none') {
             renderMap(mapData);
@@ -110,23 +134,12 @@ async function loadData(projectId) {
     } catch(e) { console.error(e); }
 }
 
-async function saveToInbox(text) {
-    if(!text || !currentProjectId) return alert("プロジェクトを選択してください");
-    await fetch('/api/inbox', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ text: text, project_id: currentProjectId })
-    });
-    loadData(currentProjectId);
-    document.getElementById('manual-input').value = '';
-}
-
 async function deleteItem(id) {
     await fetch(`/api/inbox?id=${id}`, { method: 'DELETE' });
     loadData(currentProjectId);
 }
 
-// --- AI 統合 ---
+// AI
 async function organizeWithAI() {
     if(inboxData.length === 0) return alert("Inboxが空です");
     const btn = document.getElementById('ai-btn');
@@ -146,13 +159,13 @@ async function organizeWithAI() {
             loadData(currentProjectId);
             alert("マップを更新しました！");
         } else {
-            alert('エラー: ' + result.message);
+            alert('AIエラー: ' + result.message);
         }
     } catch (e) { alert('通信エラー'); } 
     finally { btn.innerHTML = originalIcon; btn.disabled = false; }
 }
 
-// --- 基本設定 ---
+// 初期化
 const listEl = document.getElementById('idea-ul');
 new Sortable(listEl, { animation: 150 });
 
@@ -179,31 +192,36 @@ function toggleInput() {
 function addManualItem() { saveToInbox(document.getElementById('manual-input').value); }
 function handleEnter(e) { if(e.key === 'Enter') addManualItem(); }
 
-// D3.js マップ描画 (サイズ自動調整対応)
+function renderInbox() {
+    const ul = document.getElementById('idea-ul');
+    ul.innerHTML = '';
+    if(inboxData.length === 0) {
+        document.getElementById('empty-state').style.display = 'block';
+    } else {
+        document.getElementById('empty-state').style.display = 'none';
+        inboxData.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span>${item.text}</span><button class="delete-btn" onclick="deleteItem(${item.id})"><i class="fa-solid fa-trash"></i></button>`;
+            ul.appendChild(li);
+        });
+    }
+}
+
+// D3 Map (省略なし)
 function renderMap(data) {
     const svg = d3.select("#mindmap-svg");
     svg.selectAll("*").remove();
-    
     const container = document.getElementById('map-area');
     const width = container.clientWidth;
     const height = container.clientHeight;
     svg.attr("width", width).attr("height", height);
-
     const g = svg.append("g");
     svg.call(d3.zoom().on("zoom", (e) => g.attr("transform", e.transform)));
-
     const root = d3.hierarchy(data);
     const treeLayout = d3.tree().size([height - 100, width - 200]);
     treeLayout(root);
-
-    g.selectAll(".link").data(root.links()).enter().append("path")
-        .attr("class", "link")
-        .attr("d", d3.linkHorizontal().x(d => d.y + 50).y(d => d.x + 50));
-
-    const node = g.selectAll(".node").data(root.descendants()).enter().append("g")
-        .attr("class", "node")
-        .attr("transform", d => `translate(${d.y + 50},${d.x + 50})`);
-
+    g.selectAll(".link").data(root.links()).enter().append("path").attr("class", "link").attr("d", d3.linkHorizontal().x(d => d.y + 50).y(d => d.x + 50));
+    const node = g.selectAll(".node").data(root.descendants()).enter().append("g").attr("class", "node").attr("transform", d => `translate(${d.y + 50},${d.x + 50})`);
     node.append("rect").attr("width", 120).attr("height", 40).attr("y", -20).attr("x", 0);
     node.append("text").attr("dy", 5).attr("x", 10).text(d => d.data.topic);
 }
