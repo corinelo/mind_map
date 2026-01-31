@@ -127,6 +127,7 @@ def handle_inbox():
             
     return jsonify({"status": "error"})
 
+# --- 修正版のAI処理 ---
 @app.route('/api/ai_organize', methods=['POST'])
 def ai_organize():
     if not API_KEY:
@@ -156,7 +157,16 @@ def ai_organize():
     """
 
     try:
-        response = model.generate_content(prompt)
+        # まずは最新のFlashモデルで試す
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt)
+        except Exception as e:
+            # Flashがダメなら、安定版のgemini-proで再トライ
+            print(f"Retrying with gemini-pro due to: {e}")
+            model = genai.GenerativeModel('gemini-pro')
+            response = model.generate_content(prompt)
+
         text_resp = response.text
         match = re.search(r'\{.*\}', text_resp, re.DOTALL)
         if match:
@@ -176,3 +186,4 @@ def ai_organize():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
