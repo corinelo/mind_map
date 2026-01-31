@@ -1,6 +1,6 @@
 Flask
 Flask-SQLAlchemy
-google-generativeai
+google-generativeai>=0.7.0
 psycopg2-binary
 gunicorn
 grpcio
