@@ -1,0 +1,20 @@
+{
+  "name": "ZenMap Sync",
+  "short_name": "ZenMap",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2E3440",
+  "theme_color": "#3B4252",
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/3B4252/88C0D0?text=ZM",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://placehold.co/512x512/3B4252/88C0D0?text=ZM",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
