@@ -157,17 +157,14 @@ def ai_organize():
     """
 
     try:
-        # まずは最新のFlashモデルで試す
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
-        except Exception as e:
-            # Flashがダメなら、安定版のgemini-proで再トライ
-            print(f"Retrying with gemini-pro due to: {e}")
-            model = genai.GenerativeModel('gemini-pro')
-            response = model.generate_content(prompt)
-
+        # 最新モデルを指定
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(prompt)
         text_resp = response.text
+        
+        # ログにAIの返答を表示（デバッグ用）
+        print(f"--- AI Response ---\n{text_resp}\n-------------------")
+
         match = re.search(r'\{.*\}', text_resp, re.DOTALL)
         if match:
             new_map = json.loads(match.group(0))
