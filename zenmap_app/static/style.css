@@ -420,3 +420,116 @@ body.fullscreen-mode #open-inbox-btn {
 @media (max-width: 768px) {
     #fullscreen-btn { display: none; }
 }
+
+/* --- static/style.css への追記・修正 --- */
+
+/* 1. Inbox下のアクションエリア */
+.inbox-actions {
+    margin-top: auto; /* サイドバーの一番下に押し下げる */
+    padding: 15px;
+    display: flex;
+    gap: 10px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.2);
+}
+
+.action-btn-large {
+    flex: 1; /* 横幅いっぱいに広げる */
+    height: 44px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: white;
+    transition: all 0.2s;
+}
+
+/* マイクボタン */
+#mic-btn {
+    background: #4C566A;
+}
+#mic-btn.mic-on {
+    background: var(--accent-red);
+    animation: pulse 1.5s infinite;
+}
+
+/* AIボタン */
+#ai-btn {
+    background: var(--accent-blue);
+    font-weight: bold;
+}
+#ai-btn:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 4px 10px rgba(94, 129, 172, 0.4);
+}
+
+/* 2. マップエリア右上のコントロール群 */
+.map-controls {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.history-group {
+    display: flex;
+    background: var(--bg-panel);
+    border-radius: 8px;
+    padding: 2px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.history-group button {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 14px;
+}
+.history-group button:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+/* 全画面ボタン（以前のスタイルを少し調整） */
+#fullscreen-btn {
+    position: static; /* absolute解除（親が管理するため） */
+    width: 40px;
+    height: 40px;
+    border-radius: 8px; /* 丸から四角へ統一 */
+    border: none;
+    background: var(--bg-panel);
+    color: var(--text-main);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    cursor: pointer;
+    font-size: 16px;
+}
+#fullscreen-btn:hover {
+    background: var(--accent-blue);
+    color: white;
+}
+
+/* 3. 古いフッター設定の削除/無効化（念の為） */
+#control-footer {
+    display: none !important;
+}
+#layout-container {
+    height: 100vh; /* 画面いっぱい */
+}
+
+/* スマホ対応調整 */
+@media (max-width: 768px) {
+    .map-controls {
+        top: 10px; right: 10px;
+    }
+    #fullscreen-btn { display: none; } /* スマホでは全画面ボタン不要 */
+}

@@ -35,9 +35,7 @@
                 <button onclick="toggleProjectSidebar()" class="mobile-menu-btn">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-                
                 <h2 id="inbox-title">Inbox</h2>
-                
                 <button onclick="toggleInboxSidebar()" class="collapse-btn-pc">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
@@ -64,12 +62,28 @@
 
             <div id="empty-state">
                 <i class="fa-regular fa-lightbulb"></i>
-                <p>アイデアを追加するか<br>マイクで話しかけてください</p>
+                <p>アイデアを追加</p>
+            </div>
+
+            <div class="inbox-actions">
+                <button id="mic-btn" class="mic-off action-btn-large">
+                    <i class="fa-solid fa-microphone"></i>
+                </button>
+                <button id="ai-btn" onclick="organizeWithAI()" class="action-btn-large">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> 整理
+                </button>
             </div>
         </aside>
 
         <main id="map-area">
-            <button id="fullscreen-btn" onclick="toggleFullscreen()"><i class="fa-solid fa-expand"></i></button>
+            <div class="map-controls">
+                <div class="history-group">
+                    <button id="undo-btn" onclick="undo()" title="元に戻す"><i class="fa-solid fa-rotate-left"></i></button>
+                    <button id="redo-btn" onclick="redo()" title="やり直す"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+                <button id="fullscreen-btn" onclick="toggleFullscreen()" title="全画面"><i class="fa-solid fa-expand"></i></button>
+            </div>
+
             <button id="open-inbox-btn" onclick="toggleInboxSidebar()" style="display:none;">
                 <i class="fa-solid fa-list"></i>
             </button>
@@ -77,28 +91,6 @@
             <svg id="mindmap-svg"></svg>
         </main>
 
-    </div>
-
-    <div id="control-footer">
-        
-        <div class="history-controls">
-            <button id="undo-btn" onclick="undo()" class="history-btn">
-                <i class="fa-solid fa-rotate-left"></i>
-            </button>
-            <button id="redo-btn" onclick="redo()" class="history-btn">
-                <i class="fa-solid fa-rotate-right"></i>
-            </button>
-        </div>
-
-        <div class="mic-wrapper">
-            <button id="mic-btn" class="mic-off">
-                <i class="fa-solid fa-microphone"></i>
-            </button>
-        </div>
-        
-        <button id="ai-btn" onclick="organizeWithAI()">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-        </button>
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
