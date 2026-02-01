@@ -4,15 +4,74 @@ let mapData = {};
 let inboxData = [];
 let selectedNodeId = null;
 
-// --- プロジェクト管理 (修正版) ---
+// --- Undo/Redo History Stacks ---
+let historyStack = [];
+let redoStack = [];
 
+// 履歴を保存する（変更を加える直前に呼ぶ）
+function pushHistory() {
+    // 現在のmapDataをディープコピーして保存
+    const state = JSON.parse(JSON.stringify(mapData));
+    historyStack.push(state);
+    // 新しい操作をしたら未来（Redo）は消える
+    redoStack = [];
+    updateUndoRedoButtons();
+}
+
+async function undo() {
+    if (historyStack.length === 0) return;
+
+    // 現在の状態を未来（Redo）に送る
+    const current = JSON.parse(JSON.stringify(mapData));
+    redoStack.push(current);
+
+    // 過去（History）から取り出す
+    const prev = historyStack.pop();
+    mapData = prev;
+
+    // 選択状態の復元（もし削除したノードならルートに戻すなどのケアが必要だが一旦ルートへ）
+    // 簡易的にルートを選択（またはIDが存在すれば維持）
+    if(selectedNodeId && !findNode(mapData, selectedNodeId)) {
+        selectedNodeId = mapData.id;
+    }
+
+    renderMap(mapData);
+    saveMapToServer(); // サーバーにも戻った状態を保存
+    updateUndoRedoButtons();
+}
+
+async function redo() {
+    if (redoStack.length === 0) return;
+
+    // 現在の状態を過去（History）に送る
+    const current = JSON.parse(JSON.stringify(mapData));
+    historyStack.push(current);
+
+    // 未来（Redo）から取り出す
+    const next = redoStack.pop();
+    mapData = next;
+
+    renderMap(mapData);
+    saveMapToServer();
+    updateUndoRedoButtons();
+}
+
+function updateUndoRedoButtons() {
+    // ボタンの見た目制御（あれば）
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
+    if(undoBtn) undoBtn.style.opacity = historyStack.length > 0 ? 1 : 0.3;
+    if(redoBtn) redoBtn.style.opacity = redoStack.length > 0 ? 1 : 0.3;
+}
+
+
+// --- プロジェクト管理 ---
 async function loadProjects(shouldSelectId = null) {
     try {
         const res = await fetch('/api/projects');
         const projects = await res.json();
-        
         const listEl = document.getElementById('project-list');
-        listEl.innerHTML = ''; // リストをクリア
+        listEl.innerHTML = '';
         
         if (projects.length === 0) {
             document.getElementById('inbox-title').innerText = "Inbox";
@@ -22,177 +81,86 @@ async function loadProjects(shouldSelectId = null) {
         projects.forEach(p => {
             const li = document.createElement('li');
             li.className = 'project-item';
-            li.dataset.id = p.id; // IDをデータ属性として持たせる
-            
-            // 現在選択中ならactiveクラス
+            li.dataset.id = p.id;
             if (p.id == currentProjectId) li.classList.add('active');
-
-            // クリックイベント
             li.onclick = () => switchProject(p.id, p.name);
-            
-            li.innerHTML = `
-                <span><i class="fa-solid fa-folder"></i> ${p.name}</span>
-                <button class="project-delete-btn" onclick="deleteProject(event, ${p.id})">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-            `;
+            li.innerHTML = `<span><i class="fa-solid fa-folder"></i> ${p.name}</span>
+                            <button class="project-delete-btn" onclick="deleteProject(event, ${p.id})"><i class="fa-solid fa-trash"></i></button>`;
             listEl.appendChild(li);
         });
 
-        // 指定があればそれを選択、なければ既存維持、それもなければ先頭
         if (shouldSelectId) {
             const target = projects.find(p => p.id == shouldSelectId);
             if(target) switchProject(target.id, target.name);
         } else if (!currentProjectId && projects.length > 0) {
             switchProject(projects[0].id, projects[0].name);
         } else if (currentProjectId) {
-            // 名前だけ更新（念の為）
             const current = projects.find(p => p.id == currentProjectId);
             if(current) {
                 currentProjectName = current.name;
                 document.getElementById('inbox-title').innerText = current.name;
-            } else {
-                // 削除されてた場合などは先頭へ
-                switchProject(projects[0].id, projects[0].name);
-            }
+            } else { switchProject(projects[0].id, projects[0].name); }
         }
-
     } catch(e) { console.error("Project Load Error:", e); }
 }
 
-// 切り替え処理（リスト再描画を行わない軽量版）
 function switchProject(id, name) {
     currentProjectId = id;
     currentProjectName = name;
-    
-    // UI更新: タイトル
     document.getElementById('inbox-title').innerText = name || "Inbox";
     
-    // UI更新: リストのActiveクラス付け替え
+    // 履歴をクリア（プロジェクトが変わったらUndoできないようにする）
+    historyStack = [];
+    redoStack = [];
+    updateUndoRedoButtons();
+
     const listEl = document.getElementById('project-list');
     Array.from(listEl.children).forEach(li => {
         if (li.dataset.id == id) li.classList.add('active');
         else li.classList.remove('active');
     });
-
-    // データの読み込み
     loadData(id);
-    
-    // スマホ用: サイドバーを閉じる
     document.getElementById('project-sidebar').classList.remove('active');
 }
 
 async function createProject() {
     const name = prompt("新しいプロジェクト名:");
     if(!name) return;
-    
     try {
-        const res = await fetch('/api/projects', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ name: name })
-        });
+        const res = await fetch('/api/projects', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: name }) });
         const data = await res.json();
-        // 作成したら、そのIDを指定してリロード
         loadProjects(data.id);
     } catch(e) { console.error(e); }
 }
 
 async function deleteProject(event, id) {
-    event.stopPropagation(); // 親のクリックを阻止
+    event.stopPropagation();
     if(!confirm("プロジェクトを完全に削除しますか？")) return;
-    
     await fetch(`/api/projects?id=${id}`, { method: 'DELETE' });
-    
-    // 現在開いているプロジェクトを消した場合はnullにする
     if(currentProjectId == id) currentProjectId = null;
-    
     loadProjects();
 }
 
-
-// --- マインドマップ描画 (Dynamic Size対応) ---
-
-function renderMap(data) {
-    const svg = d3.select("#mindmap-svg");
-    svg.selectAll("*").remove();
-    
-    const container = document.getElementById('map-area');
-    // コンテナが非表示なら描画しない（エラー防止）
-    if(container.clientWidth === 0) return;
-
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    svg.attr("width", width).attr("height", height);
-
-    const g = svg.append("g");
-    svg.call(d3.zoom().on("zoom", (e) => g.attr("transform", e.transform)));
-
-    const root = d3.hierarchy(data);
-    
-    // ツリーのサイズ設定
-    // 横幅は固定せず、ノード間隔で調整するほうが自然ですが、
-    // 今回は簡易的に画面サイズベースで広げます
-    const treeLayout = d3.tree()
-        .size([height - 100, width - 250])
-        .separation((a, b) => (a.parent == b.parent ? 1.5 : 2)); // 兄弟間の距離を少し開ける
+// --- データ読み込み ---
+async function loadData(projectId) {
+    if(!projectId) return;
+    try {
+        const res = await fetch(`/api/data/${projectId}`);
+        const data = await res.json();
+        mapData = data.map;
+        if(!mapData.children) mapData.children = []; // 安全策
+        inboxData = data.inbox;
+        renderInbox();
         
-    treeLayout(root);
-
-    // リンク（線）
-    g.selectAll(".link")
-        .data(root.links())
-        .enter().append("path")
-        .attr("class", "link")
-        .attr("d", d3.linkHorizontal()
-            .x(d => d.y + 0) // ノードのpadding分調整が必要だが一旦0
-            .y(d => d.x + 0));
-
-    // ノードグループ作成
-    const node = g.selectAll(".node")
-        .data(root.descendants())
-        .enter().append("g")
-        .attr("class", "node")
-        .attr("transform", d => `translate(${d.y},${d.x})`)
-        .on("click", (e, d) => {
-            e.stopPropagation();
-            selectedNodeId = d.data.id;
-            renderMap(mapData);
-        })
-        .on("dblclick", (e, d) => {
-            e.stopPropagation();
-            editNodeText(d.data.id);
-        });
-
-    // 1. まずテキストを追加（サイズ計測のため）
-    node.append("text")
-        .attr("dy", 5)
-        .attr("x", 10) // 左padding
-        .style("text-anchor", "start")
-        .text(d => d.data.topic)
-        .each(function(d) {
-            // テキストのサイズを測ってデータに保存
-            d.bbox = this.getBBox();
-        });
-
-    // 2. Rectを追加（テキストの下に敷くため insert befor text）
-    node.insert("rect", "text")
-        .attr("x", 0)
-        .attr("y", -15) // テキストの高さに合わせて調整
-        .attr("width", d => d.bbox.width + 20) // 左右padding
-        .attr("height", 30) // 高さは固定気味でOK、あるいは d.bbox.height + 10
-        .attr("class", d => d.data.id === selectedNodeId ? "selected" : "");
-        
-    // リンクの接続位置修正（Rectのサイズが変わったので、線の開始位置はずらすのが理想だが
-    // D3 Treeのデフォルトは中心間接続なので、ここではシンプルに「左端」につなぐ実装のままにします）
+        const mapArea = document.getElementById('map-area');
+        if(window.getComputedStyle(mapArea).display !== 'none') {
+             renderMap(mapData);
+        }
+    } catch(e) { console.error(e); }
 }
 
-
-// --- その他ロジック（ショートカットなど） ---
-// ※ここは前回のコードと同じですが、findParentなどのヘルパー関数が必要です。
-// 　前回のコードから消えていない前提ですが、念の為重要な部分だけ再掲します。
-
+// --- マインドマップ操作 ---
 const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
-
 function findNode(node, id) {
     if (node.id === id) return node;
     if (node.children) {
@@ -213,7 +181,6 @@ function findParent(root, id) {
     return null;
 }
 
-// データ保存
 async function saveMapToServer() {
     if(!currentProjectId) return;
     await fetch('/api/save_map', {
@@ -226,19 +193,42 @@ function updateMapAndSelect(newId) {
     renderMap(mapData);
     saveMapToServer();
 }
+
 function editNodeText(nodeId) {
     const nodeData = findNode(mapData, nodeId);
     if(!nodeData) return;
+    
+    // promptが開く前に現在のテキストを保持しておきたいが、
+    // キャンセルされたら変更しないので、変更確定直前にpushHistoryする
     const newText = prompt("編集:", nodeData.topic);
+    
     if(newText !== null && newText.trim() !== "") {
+        pushHistory(); // 【履歴追加】
         nodeData.topic = newText;
-        renderMap(mapData); // ここで再描画すればRectサイズも再計算される
+        renderMap(mapData);
         saveMapToServer();
     }
 }
 
-// キーボードイベント (前回と同じものを貼る)
+// --- キーボードイベント (Undo/Redo追加) ---
 document.addEventListener('keydown', (e) => {
+    // 常に有効なショートカット (Undo/Redo)
+    if (currentProjectId && document.getElementById('map-area').style.display !== 'none') {
+        // Ctrl+Z (Undo)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+            return;
+        }
+        // Ctrl+Y or Ctrl+Shift+Z (Redo)
+        if (((e.ctrlKey || e.metaKey) && e.key === 'y') || 
+            ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey)) {
+            e.preventDefault();
+            redo();
+            return;
+        }
+    }
+
     if(document.getElementById('map-area').style.display === 'none') return;
     if(e.target.tagName === 'INPUT') return; 
     if (!selectedNodeId) return;
@@ -247,12 +237,15 @@ document.addEventListener('keydown', (e) => {
 
     if (e.key === 'Tab') {
         e.preventDefault();
+        pushHistory(); // 【履歴追加】
         const newNode = { id: generateId(), topic: "New", children: [] };
         if (!selectedNode.children) selectedNode.children = [];
         selectedNode.children.push(newNode);
         updateMapAndSelect(newNode.id);
+
     } else if (e.key === 'Enter') {
         e.preventDefault();
+        pushHistory(); // 【履歴追加】
         const parent = findParent(mapData, selectedNodeId);
         if (parent) {
             const newNode = { id: generateId(), topic: "New", children: [] };
@@ -264,19 +257,24 @@ document.addEventListener('keydown', (e) => {
              selectedNode.children.push(newNode);
              updateMapAndSelect(newNode.id);
         }
+
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
         const parent = findParent(mapData, selectedNodeId);
         if (parent) {
+            pushHistory(); // 【履歴追加】
             parent.children = parent.children.filter(n => n.id !== selectedNodeId);
             selectedNodeId = parent.id;
             updateMapAndSelect(selectedNodeId);
         }
+
     } else if (e.key === ' ') {
         e.preventDefault();
         editNodeText(selectedNodeId);
+
     } else if (e.key.startsWith('Arrow')) {
         e.preventDefault();
         const parent = findParent(mapData, selectedNodeId);
+        // 移動は履歴に残さなくて良い（構造変化ではないため）
         if (e.key === 'ArrowLeft' && parent) {
             selectedNodeId = parent.id; renderMap(mapData);
         } else if (e.key === 'ArrowRight' && selectedNode.children?.length) {
@@ -291,45 +289,45 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Load Data
-async function loadData(projectId) {
-    if(!projectId) return;
-    try {
-        const res = await fetch(`/api/data/${projectId}`);
-        const data = await res.json();
-        mapData = data.map;
-        if(!mapData.children) mapData.children = [];
-        inboxData = data.inbox;
-        renderInbox();
-        
-        // Mapが可視状態なら描画
-        const mapArea = document.getElementById('map-area');
-        // display: none でない、かつ親要素(main)が表示されているかチェック
-        if(window.getComputedStyle(mapArea).display !== 'none') {
-             renderMap(mapData);
-        }
-    } catch(e) { console.error(e); }
+// --- マップ描画 (D3) ---
+function renderMap(data) {
+    const svg = d3.select("#mindmap-svg");
+    svg.selectAll("*").remove();
+    const container = document.getElementById('map-area');
+    if(container.clientWidth === 0) return;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    svg.attr("width", width).attr("height", height);
+
+    const g = svg.append("g");
+    svg.call(d3.zoom().on("zoom", (e) => g.attr("transform", e.transform)));
+
+    const root = d3.hierarchy(data);
+    const treeLayout = d3.tree().size([height - 100, width - 250])
+        .separation((a, b) => (a.parent == b.parent ? 1.5 : 2));
+    treeLayout(root);
+
+    g.selectAll(".link").data(root.links()).enter().append("path").attr("class", "link")
+        .attr("d", d3.linkHorizontal().x(d => d.y).y(d => d.x));
+
+    const node = g.selectAll(".node").data(root.descendants()).enter().append("g")
+        .attr("class", "node").attr("transform", d => `translate(${d.y},${d.x})`)
+        .on("click", (e, d) => { e.stopPropagation(); selectedNodeId = d.data.id; renderMap(mapData); })
+        .on("dblclick", (e, d) => { e.stopPropagation(); editNodeText(d.data.id); });
+
+    node.append("text").attr("dy", 5).attr("x", 10).style("text-anchor", "start").text(d => d.data.topic)
+        .each(function(d) { d.bbox = this.getBBox(); });
+    node.insert("rect", "text").attr("x", 0).attr("y", -15).attr("width", d => d.bbox.width + 20).attr("height", 30)
+        .attr("class", d => d.data.id === selectedNodeId ? "selected" : "");
 }
 
-// 共通パーツ
-async function saveToInbox(text) {
-    if(!currentProjectId) return alert("プロジェクトを選択してください");
-    await fetch('/api/inbox', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ text: text, project_id: currentProjectId })
-    });
-    loadData(currentProjectId);
-    document.getElementById('manual-input').value = '';
-}
-async function deleteItem(id) {
-    await fetch(`/api/inbox?id=${id}`, { method: 'DELETE' });
-    loadData(currentProjectId);
-}
+// --- AI 処理 ---
 async function organizeWithAI() {
     if(inboxData.length === 0) return alert("Inboxが空です");
     const btn = document.getElementById('ai-btn');
     const originalIcon = btn.innerHTML;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true;
+
     try {
         const res = await fetch('/api/ai_organize', {
             method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -337,11 +335,25 @@ async function organizeWithAI() {
         });
         const result = await res.json();
         if (result.status === 'success') {
+            pushHistory(); // 【履歴追加】AIが書き換える前に保存
             mapData = result.new_map;
             loadData(currentProjectId);
+            // AI処理後は未来のスタックも消える（pushHistory内で処理済）
         } else { alert('エラー: ' + result.message); }
     } catch (e) { alert('通信エラー'); } 
     finally { btn.innerHTML = originalIcon; btn.disabled = false; }
+}
+
+// 共通パーツ
+async function saveToInbox(text) {
+    if(!currentProjectId) return alert("プロジェクトを選択してください");
+    await fetch('/api/inbox', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text: text, project_id: currentProjectId }) });
+    loadData(currentProjectId);
+    document.getElementById('manual-input').value = '';
+}
+async function deleteItem(id) {
+    await fetch(`/api/inbox?id=${id}`, { method: 'DELETE' });
+    loadData(currentProjectId);
 }
 
 // 初期化
@@ -352,39 +364,20 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 if (SpeechRecognition) {
     const recognition = new SpeechRecognition();
     recognition.lang = 'ja-JP';
-    micBtn.addEventListener('click', () => {
-        if (micBtn.classList.contains('mic-off')) recognition.start(); else recognition.stop();
-    });
+    micBtn.addEventListener('click', () => { if (micBtn.classList.contains('mic-off')) recognition.start(); else recognition.stop(); });
     recognition.onstart = () => micBtn.classList.replace('mic-off', 'mic-on');
     recognition.onend = () => micBtn.classList.replace('mic-on', 'mic-off');
     recognition.onresult = (e) => saveToInbox(e.results[0][0].transcript);
 } else { micBtn.style.display = 'none'; }
-function toggleInput() {
-    const area = document.getElementById('input-area');
-    area.style.display = area.style.display === 'none' ? 'flex' : 'none';
-    if(area.style.display === 'flex') document.getElementById('manual-input').focus();
-}
+function toggleInput() { const area = document.getElementById('input-area'); area.style.display = area.style.display === 'none' ? 'flex' : 'none'; if(area.style.display === 'flex') document.getElementById('manual-input').focus(); }
 function addManualItem() { saveToInbox(document.getElementById('manual-input').value); }
 function handleEnter(e) { if(e.key === 'Enter') addManualItem(); }
 function toggleProjectSidebar() { document.getElementById('project-sidebar').classList.toggle('active'); }
-function toggleInboxSidebar() {
-    const inbox = document.getElementById('inbox-sidebar');
-    const openBtn = document.getElementById('open-inbox-btn');
-    if (inbox.style.display === 'none') { inbox.style.display = 'flex'; openBtn.style.display = 'none'; }
-    else { inbox.style.display = 'none'; openBtn.style.display = 'block'; }
-}
+function toggleInboxSidebar() { const inbox = document.getElementById('inbox-sidebar'); const openBtn = document.getElementById('open-inbox-btn'); if (inbox.style.display === 'none') { inbox.style.display = 'flex'; openBtn.style.display = 'none'; } else { inbox.style.display = 'none'; openBtn.style.display = 'block'; } }
 function renderInbox() {
-    const ul = document.getElementById('idea-ul');
-    ul.innerHTML = '';
+    const ul = document.getElementById('idea-ul'); ul.innerHTML = '';
     if(inboxData.length === 0) document.getElementById('empty-state').style.display = 'block';
-    else {
-        document.getElementById('empty-state').style.display = 'none';
-        inboxData.forEach(item => {
-            const li = document.createElement('li');
-            li.innerHTML = `<span>${item.text}</span><button class="delete-btn" onclick="deleteItem(${item.id})"><i class="fa-solid fa-trash"></i></button>`;
-            ul.appendChild(li);
-        });
-    }
+    else { document.getElementById('empty-state').style.display = 'none'; inboxData.forEach(item => { const li = document.createElement('li'); li.innerHTML = `<span>${item.text}</span><button class="delete-btn" onclick="deleteItem(${item.id})"><i class="fa-solid fa-trash"></i></button>`; ul.appendChild(li); }); }
 }
 window.onload = () => loadProjects();
 window.onresize = () => loadData(currentProjectId);

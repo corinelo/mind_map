@@ -75,6 +75,24 @@
             </div>
         </aside>
 
+        <div id="control-footer">
+    
+    <div class="history-controls">
+        <button id="undo-btn" onclick="undo()" class="history-btn"><i class="fa-solid fa-rotate-left"></i></button>
+        <button id="redo-btn" onclick="redo()" class="history-btn"><i class="fa-solid fa-rotate-right"></i></button>
+    </div>
+
+    <div class="mic-wrapper">
+        <button id="mic-btn" class="mic-off">
+            <i class="fa-solid fa-microphone"></i>
+        </button>
+    </div>
+    
+    <button id="ai-btn" onclick="organizeWithAI()">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+    </button>
+</div>
+
         <main id="map-area">
             <button id="open-inbox-btn" onclick="toggleInboxSidebar()" style="display:none;">
                 <i class="fa-solid fa-list"></i>
