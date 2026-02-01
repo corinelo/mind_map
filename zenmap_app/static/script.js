@@ -148,6 +148,66 @@ function findParent(root, id) {
 const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
 
 // キーボードショートカット
+document.addEventListener('keydown', (e) => {
+    // マップが表示されていない、または入力中は無視
+    if(document.getElementById('map-area').style.display === 'none') return;
+    if(e.target.tagName === 'INPUT') return; 
+
+    if (!selectedNodeId) return;
+
+    const selectedNode = findNode(mapData, selectedNodeId);
+    if (!selectedNode) return;
+
+    // Tab: 子ノード追加
+    if (e.key === 'Tab') {
+        e.preventDefault(); // フォーカス移動防止
+        const newNode = { id: generateId(), topic: "New Idea", children: [] };
+        if (!selectedNode.children) selectedNode.children = [];
+        selectedNode.children.push(newNode);
+        updateMapAndSelect(newNode.id);
+    }
+    
+    // Enter: 兄弟ノード追加 (ルートの場合は子を追加)
+    else if (e.key === 'Enter') {
+        e.preventDefault();
+        const parent = findParent(mapData, selectedNodeId);
+        if (parent) {
+            const newNode = { id: generateId(), topic: "New Idea", children: [] };
+            parent.children.push(newNode);
+            updateMapAndSelect(newNode.id);
+        } else {
+            // ルートを選択中はTabと同じ挙動（子を追加）
+            const newNode = { id: generateId(), topic: "New Idea", children: [] };
+            if (!selectedNode.children) selectedNode.children = [];
+            selectedNode.children.push(newNode);
+            updateMapAndSelect(newNode.id);
+        }
+    }
+
+    // Backspace / Delete: 削除
+    else if (e.key === 'Backspace' || e.key === 'Delete') {
+        const parent = findParent(mapData, selectedNodeId);
+        if (parent) {
+            parent.children = parent.children.filter(n => n.id !== selectedNodeId);
+            selectedNodeId = parent.id; // 親を選択状態に
+            updateMapAndSelect(selectedNodeId);
+        } else {
+            alert("ルートノードは削除できません");
+        }
+    }
+
+    // Space: 編集モード開始
+    else if (e.key === ' ' && !e.repeat) {
+        e.preventDefault();
+        editNodeText(selectedNodeId);
+    }
+});
+
+function updateMapAndSelect(newId) {
+    selectedNodeId = newId;
+    renderMap(mapData);
+    saveMapToServer(); // 変更を保存
+}
 // キーボードショートカット
 document.addEventListener('keydown', (e) => {
     // マップが表示されていない、または入力中は無視
