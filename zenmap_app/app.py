@@ -127,7 +127,7 @@ def handle_inbox():
             
     return jsonify({"status": "error"})
 
-# --- 修正版のAI処理 ---
+# --- 修正版 AI処理 (自動モデル検索機能付き) ---
 @app.route('/api/ai_organize', methods=['POST'])
 def ai_organize():
     if not API_KEY:
@@ -157,14 +157,43 @@ def ai_organize():
     """
 
     try:
-        # 最新モデルを指定
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # 【重要】利用可能なモデルを動的に探す
+        available_model_name = None
+        
+        # 優先順位リスト
+        preferred_models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+        
+        try:
+            # APIからモデル一覧を取得
+            print("Listing available models...")
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    name = m.name.replace('models/', '') # 'models/gemini-pro' -> 'gemini-pro'
+                    print(f"Found model: {name}")
+                    # 優先リストにあるものが見つかれば即採用
+                    if name in preferred_models:
+                        available_model_name = name
+                        break
+            
+            # 優先リストになくても、とりあえず使えるものがあれば使う
+            if not available_model_name:
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        available_model_name = m.name
+                        break
+        
+        except Exception as e:
+            print(f"Error listing models: {e}")
+            # リスト取得に失敗したら、イチかバチかFlashを指定
+            available_model_name = 'gemini-1.5-flash'
+
+        print(f"Using model: {available_model_name}")
+        
+        # 決定したモデルで実行
+        model = genai.GenerativeModel(available_model_name)
         response = model.generate_content(prompt)
         text_resp = response.text
         
-        # ログにAIの返答を表示（デバッグ用）
-        print(f"--- AI Response ---\n{text_resp}\n-------------------")
-
         match = re.search(r'\{.*\}', text_resp, re.DOTALL)
         if match:
             new_map = json.loads(match.group(0))
@@ -178,26 +207,7 @@ def ai_organize():
             raise ValueError("Invalid JSON from AI")
 
     except Exception as e:
-        print(f"AI Error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# 4. マップの手動保存 API (新規追加)
-@app.route('/api/save_map', methods=['POST'])
-def save_map():
-    data = request.json
-    project_id = data.get('project_id')
-    map_content = data.get('map_data')
-
-    if not project_id or not map_content:
-        return jsonify({"status": "error", "message": "Missing data"}), 400
-
-    try:
-        # 最新のマップとして保存
-        new_record = MindMap(content=json.dumps(map_content), project_id=project_id)
-        db.session.add(new_record)
-        db.session.commit()
-        return jsonify({"status": "success"})
-    except Exception as e:
+        print(f"AI Error Detail: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # （これより下の ai_organize や main ブロックは変更なし）

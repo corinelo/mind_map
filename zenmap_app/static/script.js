@@ -148,6 +148,7 @@ function findParent(root, id) {
 const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
 
 // キーボードショートカット
+// キーボードショートカット
 document.addEventListener('keydown', (e) => {
     // マップが表示されていない、または入力中は無視
     if(document.getElementById('map-area').style.display === 'none') return;
@@ -158,16 +159,18 @@ document.addEventListener('keydown', (e) => {
     const selectedNode = findNode(mapData, selectedNodeId);
     if (!selectedNode) return;
 
+    // --- 構造編集 (Tab/Enter/Delete/Space) ---
+
     // Tab: 子ノード追加
     if (e.key === 'Tab') {
-        e.preventDefault(); // フォーカス移動防止
+        e.preventDefault();
         const newNode = { id: generateId(), topic: "New Idea", children: [] };
         if (!selectedNode.children) selectedNode.children = [];
         selectedNode.children.push(newNode);
         updateMapAndSelect(newNode.id);
     }
     
-    // Enter: 兄弟ノード追加 (ルートの場合は子を追加)
+    // Enter: 兄弟ノード追加
     else if (e.key === 'Enter') {
         e.preventDefault();
         const parent = findParent(mapData, selectedNodeId);
@@ -176,7 +179,7 @@ document.addEventListener('keydown', (e) => {
             parent.children.push(newNode);
             updateMapAndSelect(newNode.id);
         } else {
-            // ルートを選択中はTabと同じ挙動（子を追加）
+            // ルートの場合
             const newNode = { id: generateId(), topic: "New Idea", children: [] };
             if (!selectedNode.children) selectedNode.children = [];
             selectedNode.children.push(newNode);
@@ -189,25 +192,62 @@ document.addEventListener('keydown', (e) => {
         const parent = findParent(mapData, selectedNodeId);
         if (parent) {
             parent.children = parent.children.filter(n => n.id !== selectedNodeId);
-            selectedNodeId = parent.id; // 親を選択状態に
+            selectedNodeId = parent.id;
             updateMapAndSelect(selectedNodeId);
         } else {
             alert("ルートノードは削除できません");
         }
     }
 
-    // Space: 編集モード開始
+    // Space: 編集
     else if (e.key === ' ' && !e.repeat) {
         e.preventDefault();
         editNodeText(selectedNodeId);
     }
-});
 
-function updateMapAndSelect(newId) {
-    selectedNodeId = newId;
-    renderMap(mapData);
-    saveMapToServer(); // 変更を保存
-}
+    // --- 矢印キー移動 (New!) ---
+
+    else if (e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const parent = findParent(mapData, selectedNodeId);
+
+        // ← (Left): 親へ移動
+        if (e.key === 'ArrowLeft') {
+            if (parent) {
+                selectedNodeId = parent.id;
+                renderMap(mapData);
+            }
+        }
+        // → (Right): 最初の子へ移動
+        else if (e.key === 'ArrowRight') {
+            if (selectedNode.children && selectedNode.children.length > 0) {
+                // 真ん中の子を選ぶと直感的だが、まずは最初の子へ
+                selectedNodeId = selectedNode.children[0].id;
+                renderMap(mapData);
+            }
+        }
+        // ↑ (Up): 前の兄弟へ移動
+        else if (e.key === 'ArrowUp') {
+            if (parent) {
+                const index = parent.children.findIndex(c => c.id === selectedNodeId);
+                if (index > 0) {
+                    selectedNodeId = parent.children[index - 1].id;
+                    renderMap(mapData);
+                }
+            }
+        }
+        // ↓ (Down): 次の兄弟へ移動
+        else if (e.key === 'ArrowDown') {
+            if (parent) {
+                const index = parent.children.findIndex(c => c.id === selectedNodeId);
+                if (index < parent.children.length - 1) {
+                    selectedNodeId = parent.children[index + 1].id;
+                    renderMap(mapData);
+                }
+            }
+        }
+    }
+});
 
 // ノード名編集機能
 function editNodeText(nodeId) {
