@@ -531,3 +531,36 @@ window.onload = () => {
     loadProjects();
 };
 window.onresize = () => loadData(currentProjectId);
+
+// --- static/script.js の末尾に追加 ---
+
+// 全画面切り替え機能
+function toggleFullscreen() {
+    const body = document.body;
+    const btnIcon = document.querySelector('#fullscreen-btn i');
+
+    // クラスを付け外ししてモード切り替え
+    body.classList.toggle('fullscreen-mode');
+
+    // アイコンの切り替え（拡大 ⇔ 縮小）
+    if (body.classList.contains('fullscreen-mode')) {
+        btnIcon.classList.remove('fa-expand');
+        btnIcon.classList.add('fa-compress');
+    } else {
+        btnIcon.classList.remove('fa-compress');
+        btnIcon.classList.add('fa-expand');
+    }
+
+    // マップのサイズが変わるので再描画させる
+    // (少し待ってから実行すると、アニメーション後のサイズで綺麗に描画できる)
+    setTimeout(() => {
+        renderMap(mapData);
+    }, 100);
+}
+
+// Escキーで全画面解除できるようにする
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('fullscreen-mode')) {
+        toggleFullscreen();
+    }
+});

@@ -379,3 +379,44 @@ body {
     /* マップモードでもフッター（マイクなど）をマップの上に浮かせたい場合 */
     /* 今回はシンプルに「見るだけ」にするため、マップモードではフッターは隠れます */
 }
+
+/* --- static/style.css の末尾に追加 --- */
+
+/* 全画面ボタンのスタイル */
+#fullscreen-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100; /* マップより手前に */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg-panel);
+    color: var(--text-main);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+}
+#fullscreen-btn:hover {
+    background: var(--accent-blue);
+    color: white;
+}
+
+/* ★全画面モード時のスタイル */
+/* bodyにこのクラスがつくと、サイドバーが消えてマップが広がる */
+body.fullscreen-mode #project-sidebar,
+body.fullscreen-mode #inbox-sidebar {
+    display: none !important; /* 強制的に消す */
+}
+
+/* 全画面時はInboxを開くボタンも邪魔なので消す */
+body.fullscreen-mode #open-inbox-btn {
+    display: none !important;
+}
+
+/* スマホではこのボタン自体を隠す（スマホは元々全画面に近いので） */
+@media (max-width: 768px) {
+    #fullscreen-btn { display: none; }
+}
