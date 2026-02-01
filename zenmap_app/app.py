@@ -63,8 +63,11 @@ with app.app_context():
 def index():
     return render_template('index.html')
 
-@app.route('/api/projects', methods=['GET', 'POST', 'DELETE'])
+# --- app.py の handle_projects 関数を以下のように修正（PUTを追加） ---
+
+@app.route('/api/projects', methods=['GET', 'POST', 'PUT', 'DELETE'])
 def handle_projects():
+    # 1. 作成 (POST)
     if request.method == 'POST':
         data = request.json
         name = data.get('name')
@@ -74,6 +77,19 @@ def handle_projects():
             db.session.commit()
             return jsonify({"status": "success", "id": new_proj.id})
     
+    # 2. 名前変更 (PUT) ← New!
+    elif request.method == 'PUT':
+        data = request.json
+        proj_id = data.get('id')
+        new_name = data.get('name')
+        proj = Project.query.get(proj_id)
+        if proj and new_name:
+            proj.name = new_name
+            db.session.commit()
+            return jsonify({"status": "updated"})
+        return jsonify({"status": "error"}), 400
+
+    # 3. 削除 (DELETE)
     elif request.method == 'DELETE':
         proj_id = request.args.get('id')
         proj = Project.query.get(proj_id)
@@ -82,8 +98,11 @@ def handle_projects():
             db.session.commit()
             return jsonify({"status": "deleted"})
 
+    # 4. 取得 (GET)
     projects = Project.query.order_by(Project.created_at).all()
     return jsonify([{"id": p.id, "name": p.name} for p in projects])
+
+# （他の部分は変更なし）
 
 @app.route('/api/data/<int:project_id>', methods=['GET'])
 def get_project_data(project_id):

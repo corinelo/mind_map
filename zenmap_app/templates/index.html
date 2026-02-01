@@ -94,4 +94,31 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
+
+<body>
+    <div id="layout-container">
+        <aside id="inbox-sidebar" class="sidebar">
+            <div class="panel-header">
+                <button onclick="toggleProjectSidebar()" class="mobile-menu-btn"><i class="fa-solid fa-bars"></i></button>
+                <h2 id="inbox-title">Inbox</h2>
+                <button onclick="toggleInboxSidebar()" class="collapse-btn-pc"><i class="fa-solid fa-chevron-left"></i></button>
+            </div>
+
+            <div id="mobile-view-toggle">
+                <button id="tab-list" class="active" onclick="switchMobileView('list')">リスト</button>
+                <button id="tab-map" onclick="switchMobileView('map')">マップ</button>
+            </div>
+
+            <div class="input-wrapper">
+                <button onclick="toggleInput()" class="icon-btn"><i class="fa-solid fa-pen"></i></button>
+            </div>
+            </aside>
+
+        <main id="map-area">
+             <button id="open-inbox-btn" onclick="toggleInboxSidebar()" style="display:none;"><i class="fa-solid fa-list"></i></button>
+            <svg id="mindmap-svg"></svg>
+        </main>
+    </div>
+    </body>
+
 </html>

@@ -1,53 +1,57 @@
+// ==========================================
+//  Global Variables
+// ==========================================
 let currentProjectId = null;
 let currentProjectName = "Inbox";
 let mapData = {};
 let inboxData = [];
 let selectedNodeId = null;
 
-// --- Undo/Redo History Stacks ---
+// Undo/Redo Stacks
 let historyStack = [];
 let redoStack = [];
 
-// 履歴を保存する（変更を加える直前に呼ぶ）
+
+// ==========================================
+//  Undo / Redo Logic
+// ==========================================
 function pushHistory() {
-    // 現在のmapDataをディープコピーして保存
+    // 現在の状態をコピーして保存
     const state = JSON.parse(JSON.stringify(mapData));
     historyStack.push(state);
-    // 新しい操作をしたら未来（Redo）は消える
-    redoStack = [];
+    redoStack = []; // 新しい操作をしたら未来は消える
     updateUndoRedoButtons();
 }
 
 async function undo() {
     if (historyStack.length === 0) return;
 
-    // 現在の状態を未来（Redo）に送る
+    // 現在をRedoへ
     const current = JSON.parse(JSON.stringify(mapData));
     redoStack.push(current);
 
-    // 過去（History）から取り出す
+    // Historyから復元
     const prev = historyStack.pop();
     mapData = prev;
-
-    // 選択状態の復元（もし削除したノードならルートに戻すなどのケアが必要だが一旦ルートへ）
-    // 簡易的にルートを選択（またはIDが存在すれば維持）
+    
+    // 選択状態のケア（存在しなければ解除）
     if(selectedNodeId && !findNode(mapData, selectedNodeId)) {
-        selectedNodeId = mapData.id;
+        selectedNodeId = null;
     }
 
     renderMap(mapData);
-    saveMapToServer(); // サーバーにも戻った状態を保存
+    saveMapToServer();
     updateUndoRedoButtons();
 }
 
 async function redo() {
     if (redoStack.length === 0) return;
 
-    // 現在の状態を過去（History）に送る
+    // 現在をHistoryへ
     const current = JSON.parse(JSON.stringify(mapData));
     historyStack.push(current);
 
-    // 未来（Redo）から取り出す
+    // Redoから復元
     const next = redoStack.pop();
     mapData = next;
 
@@ -57,7 +61,6 @@ async function redo() {
 }
 
 function updateUndoRedoButtons() {
-    // ボタンの見た目制御（あれば）
     const undoBtn = document.getElementById('undo-btn');
     const redoBtn = document.getElementById('redo-btn');
     if(undoBtn) undoBtn.style.opacity = historyStack.length > 0 ? 1 : 0.3;
@@ -65,11 +68,14 @@ function updateUndoRedoButtons() {
 }
 
 
-// --- プロジェクト管理 ---
+// ==========================================
+//  Project Management
+// ==========================================
 async function loadProjects(shouldSelectId = null) {
     try {
         const res = await fetch('/api/projects');
         const projects = await res.json();
+        
         const listEl = document.getElementById('project-list');
         listEl.innerHTML = '';
         
@@ -82,13 +88,27 @@ async function loadProjects(shouldSelectId = null) {
             const li = document.createElement('li');
             li.className = 'project-item';
             li.dataset.id = p.id;
+            
             if (p.id == currentProjectId) li.classList.add('active');
+
+            // クリックで切り替え
             li.onclick = () => switchProject(p.id, p.name);
-            li.innerHTML = `<span><i class="fa-solid fa-folder"></i> ${p.name}</span>
-                            <button class="project-delete-btn" onclick="deleteProject(event, ${p.id})"><i class="fa-solid fa-trash"></i></button>`;
+            
+            li.innerHTML = `
+                <span><i class="fa-solid fa-folder"></i> ${p.name}</span>
+                <div class="project-actions">
+                    <button class="project-edit-btn" onclick="editProject(event, ${p.id}, '${p.name}')">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                    <button class="project-delete-btn" onclick="deleteProject(event, ${p.id})">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `;
             listEl.appendChild(li);
         });
 
+        // 選択ロジック
         if (shouldSelectId) {
             const target = projects.find(p => p.id == shouldSelectId);
             if(target) switchProject(target.id, target.name);
@@ -99,26 +119,32 @@ async function loadProjects(shouldSelectId = null) {
             if(current) {
                 currentProjectName = current.name;
                 document.getElementById('inbox-title').innerText = current.name;
-            } else { switchProject(projects[0].id, projects[0].name); }
+            } else {
+                switchProject(projects[0].id, projects[0].name);
+            }
         }
+
     } catch(e) { console.error("Project Load Error:", e); }
 }
 
 function switchProject(id, name) {
     currentProjectId = id;
     currentProjectName = name;
+    
     document.getElementById('inbox-title').innerText = name || "Inbox";
     
-    // 履歴をクリア（プロジェクトが変わったらUndoできないようにする）
+    // 履歴クリア
     historyStack = [];
     redoStack = [];
     updateUndoRedoButtons();
 
+    // UI更新
     const listEl = document.getElementById('project-list');
     Array.from(listEl.children).forEach(li => {
         if (li.dataset.id == id) li.classList.add('active');
         else li.classList.remove('active');
     });
+
     loadData(id);
     document.getElementById('project-sidebar').classList.remove('active');
 }
@@ -127,9 +153,27 @@ async function createProject() {
     const name = prompt("新しいプロジェクト名:");
     if(!name) return;
     try {
-        const res = await fetch('/api/projects', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: name }) });
+        const res = await fetch('/api/projects', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name: name })
+        });
         const data = await res.json();
         loadProjects(data.id);
+    } catch(e) { console.error(e); }
+}
+
+async function editProject(event, id, oldName) {
+    event.stopPropagation();
+    const newName = prompt("プロジェクト名を変更:", oldName);
+    if (!newName || newName === oldName) return;
+
+    try {
+        await fetch('/api/projects', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ id: id, name: newName })
+        });
+        loadProjects(currentProjectId);
     } catch(e) { console.error(e); }
 }
 
@@ -141,17 +185,45 @@ async function deleteProject(event, id) {
     loadProjects();
 }
 
-// --- データ読み込み ---
+
+// ==========================================
+//  Mobile View Toggle
+// ==========================================
+function switchMobileView(mode) {
+    const body = document.body;
+    const tabList = document.getElementById('tab-list');
+    const tabMap = document.getElementById('tab-map');
+
+    if (mode === 'list') {
+        body.classList.remove('mode-map');
+        body.classList.add('mode-list');
+        tabList.classList.add('active');
+        tabMap.classList.remove('active');
+    } else {
+        body.classList.remove('mode-list');
+        body.classList.add('mode-map');
+        tabList.classList.remove('active');
+        tabMap.classList.add('active');
+        setTimeout(() => renderMap(mapData), 50);
+    }
+}
+
+
+// ==========================================
+//  Data Loading & Saving
+// ==========================================
 async function loadData(projectId) {
     if(!projectId) return;
     try {
         const res = await fetch(`/api/data/${projectId}`);
         const data = await res.json();
         mapData = data.map;
-        if(!mapData.children) mapData.children = []; // 安全策
+        if(!mapData.children) mapData.children = [];
         inboxData = data.inbox;
+        
         renderInbox();
         
+        // マップが表示可能なら描画
         const mapArea = document.getElementById('map-area');
         if(window.getComputedStyle(mapArea).display !== 'none') {
              renderMap(mapData);
@@ -159,8 +231,20 @@ async function loadData(projectId) {
     } catch(e) { console.error(e); }
 }
 
-// --- マインドマップ操作 ---
+async function saveMapToServer() {
+    if(!currentProjectId) return;
+    await fetch('/api/save_map', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ project_id: currentProjectId, map_data: mapData })
+    });
+}
+
+
+// ==========================================
+//  Mind Map Logic (Manipulation)
+// ==========================================
 const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
+
 function findNode(node, id) {
     if (node.id === id) return node;
     if (node.children) {
@@ -171,6 +255,7 @@ function findNode(node, id) {
     }
     return null;
 }
+
 function findParent(root, id) {
     if (!root.children) return null;
     for (let child of root.children) {
@@ -181,13 +266,6 @@ function findParent(root, id) {
     return null;
 }
 
-async function saveMapToServer() {
-    if(!currentProjectId) return;
-    await fetch('/api/save_map', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ project_id: currentProjectId, map_data: mapData })
-    });
-}
 function updateMapAndSelect(newId) {
     selectedNodeId = newId;
     renderMap(mapData);
@@ -198,54 +276,54 @@ function editNodeText(nodeId) {
     const nodeData = findNode(mapData, nodeId);
     if(!nodeData) return;
     
-    // promptが開く前に現在のテキストを保持しておきたいが、
-    // キャンセルされたら変更しないので、変更確定直前にpushHistoryする
+    // 編集ダイアログ
     const newText = prompt("編集:", nodeData.topic);
     
     if(newText !== null && newText.trim() !== "") {
-        pushHistory(); // 【履歴追加】
+        pushHistory(); // 履歴保存
         nodeData.topic = newText;
         renderMap(mapData);
         saveMapToServer();
     }
 }
 
-// --- キーボードイベント (Undo/Redo追加) ---
+
+// ==========================================
+//  Keyboard Shortcuts
+// ==========================================
 document.addEventListener('keydown', (e) => {
-    // 常に有効なショートカット (Undo/Redo)
+    // Undo / Redo
     if (currentProjectId && document.getElementById('map-area').style.display !== 'none') {
-        // Ctrl+Z (Undo)
         if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-            e.preventDefault();
-            undo();
-            return;
+            e.preventDefault(); undo(); return;
         }
-        // Ctrl+Y or Ctrl+Shift+Z (Redo)
         if (((e.ctrlKey || e.metaKey) && e.key === 'y') || 
             ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey)) {
-            e.preventDefault();
-            redo();
-            return;
+            e.preventDefault(); redo(); return;
         }
     }
 
+    // Input中などは無視
     if(document.getElementById('map-area').style.display === 'none') return;
     if(e.target.tagName === 'INPUT') return; 
     if (!selectedNodeId) return;
+    
     const selectedNode = findNode(mapData, selectedNodeId);
     if (!selectedNode) return;
 
+    // Tab: Add Child
     if (e.key === 'Tab') {
         e.preventDefault();
-        pushHistory(); // 【履歴追加】
+        pushHistory();
         const newNode = { id: generateId(), topic: "New", children: [] };
         if (!selectedNode.children) selectedNode.children = [];
         selectedNode.children.push(newNode);
         updateMapAndSelect(newNode.id);
-
-    } else if (e.key === 'Enter') {
+    } 
+    // Enter: Add Sibling
+    else if (e.key === 'Enter') {
         e.preventDefault();
-        pushHistory(); // 【履歴追加】
+        pushHistory();
         const parent = findParent(mapData, selectedNodeId);
         if (parent) {
             const newNode = { id: generateId(), topic: "New", children: [] };
@@ -257,24 +335,26 @@ document.addEventListener('keydown', (e) => {
              selectedNode.children.push(newNode);
              updateMapAndSelect(newNode.id);
         }
-
-    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    } 
+    // Delete: Remove Node
+    else if (e.key === 'Backspace' || e.key === 'Delete') {
         const parent = findParent(mapData, selectedNodeId);
         if (parent) {
-            pushHistory(); // 【履歴追加】
+            pushHistory();
             parent.children = parent.children.filter(n => n.id !== selectedNodeId);
             selectedNodeId = parent.id;
             updateMapAndSelect(selectedNodeId);
         }
-
-    } else if (e.key === ' ') {
+    } 
+    // Space: Edit Text
+    else if (e.key === ' ') {
         e.preventDefault();
         editNodeText(selectedNodeId);
-
-    } else if (e.key.startsWith('Arrow')) {
+    } 
+    // Arrows: Navigation
+    else if (e.key.startsWith('Arrow')) {
         e.preventDefault();
         const parent = findParent(mapData, selectedNodeId);
-        // 移動は履歴に残さなくて良い（構造変化ではないため）
         if (e.key === 'ArrowLeft' && parent) {
             selectedNodeId = parent.id; renderMap(mapData);
         } else if (e.key === 'ArrowRight' && selectedNode.children?.length) {
@@ -289,12 +369,17 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// --- マップ描画 (D3) ---
+
+// ==========================================
+//  D3.js Rendering
+// ==========================================
 function renderMap(data) {
     const svg = d3.select("#mindmap-svg");
     svg.selectAll("*").remove();
+    
     const container = document.getElementById('map-area');
-    if(container.clientWidth === 0) return;
+    if(container.clientWidth === 0) return; // 非表示なら描画しない
+
     const width = container.clientWidth;
     const height = container.clientHeight;
     svg.attr("width", width).attr("height", height);
@@ -303,30 +388,60 @@ function renderMap(data) {
     svg.call(d3.zoom().on("zoom", (e) => g.attr("transform", e.transform)));
 
     const root = d3.hierarchy(data);
-    const treeLayout = d3.tree().size([height - 100, width - 250])
+    const treeLayout = d3.tree()
+        .size([height - 100, width - 250])
         .separation((a, b) => (a.parent == b.parent ? 1.5 : 2));
     treeLayout(root);
 
-    g.selectAll(".link").data(root.links()).enter().append("path").attr("class", "link")
+    // Links
+    g.selectAll(".link")
+        .data(root.links())
+        .enter().append("path")
+        .attr("class", "link")
         .attr("d", d3.linkHorizontal().x(d => d.y).y(d => d.x));
 
-    const node = g.selectAll(".node").data(root.descendants()).enter().append("g")
-        .attr("class", "node").attr("transform", d => `translate(${d.y},${d.x})`)
-        .on("click", (e, d) => { e.stopPropagation(); selectedNodeId = d.data.id; renderMap(mapData); })
-        .on("dblclick", (e, d) => { e.stopPropagation(); editNodeText(d.data.id); });
+    // Nodes
+    const node = g.selectAll(".node")
+        .data(root.descendants())
+        .enter().append("g")
+        .attr("class", "node")
+        .attr("transform", d => `translate(${d.y},${d.x})`)
+        .on("click", (e, d) => {
+            e.stopPropagation();
+            selectedNodeId = d.data.id;
+            renderMap(mapData);
+        })
+        .on("dblclick", (e, d) => {
+            e.stopPropagation();
+            editNodeText(d.data.id);
+        });
 
-    node.append("text").attr("dy", 5).attr("x", 10).style("text-anchor", "start").text(d => d.data.topic)
+    // Text & Rect (Auto Sizing)
+    node.append("text")
+        .attr("dy", 5)
+        .attr("x", 10)
+        .style("text-anchor", "start")
+        .text(d => d.data.topic)
         .each(function(d) { d.bbox = this.getBBox(); });
-    node.insert("rect", "text").attr("x", 0).attr("y", -15).attr("width", d => d.bbox.width + 20).attr("height", 30)
+
+    node.insert("rect", "text")
+        .attr("x", 0)
+        .attr("y", -15)
+        .attr("width", d => d.bbox.width + 20)
+        .attr("height", 30)
         .attr("class", d => d.data.id === selectedNodeId ? "selected" : "");
 }
 
-// --- AI 処理 ---
+
+// ==========================================
+//  AI & Inbox Logic
+// ==========================================
 async function organizeWithAI() {
     if(inboxData.length === 0) return alert("Inboxが空です");
     const btn = document.getElementById('ai-btn');
     const originalIcon = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; 
+    btn.disabled = true;
 
     try {
         const res = await fetch('/api/ai_organize', {
@@ -335,49 +450,84 @@ async function organizeWithAI() {
         });
         const result = await res.json();
         if (result.status === 'success') {
-            pushHistory(); // 【履歴追加】AIが書き換える前に保存
+            pushHistory(); // 履歴保存
             mapData = result.new_map;
             loadData(currentProjectId);
-            // AI処理後は未来のスタックも消える（pushHistory内で処理済）
         } else { alert('エラー: ' + result.message); }
     } catch (e) { alert('通信エラー'); } 
     finally { btn.innerHTML = originalIcon; btn.disabled = false; }
 }
 
-// 共通パーツ
 async function saveToInbox(text) {
     if(!currentProjectId) return alert("プロジェクトを選択してください");
-    await fetch('/api/inbox', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ text: text, project_id: currentProjectId }) });
+    await fetch('/api/inbox', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ text: text, project_id: currentProjectId })
+    });
     loadData(currentProjectId);
     document.getElementById('manual-input').value = '';
 }
+
 async function deleteItem(id) {
     await fetch(`/api/inbox?id=${id}`, { method: 'DELETE' });
     loadData(currentProjectId);
 }
 
-// 初期化
+
+// ==========================================
+//  Initialization
+// ==========================================
 const listEl = document.getElementById('idea-ul');
 new Sortable(listEl, { animation: 150 });
+
 const micBtn = document.getElementById('mic-btn');
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
 if (SpeechRecognition) {
     const recognition = new SpeechRecognition();
     recognition.lang = 'ja-JP';
-    micBtn.addEventListener('click', () => { if (micBtn.classList.contains('mic-off')) recognition.start(); else recognition.stop(); });
+    micBtn.addEventListener('click', () => {
+        if (micBtn.classList.contains('mic-off')) recognition.start(); 
+        else recognition.stop();
+    });
     recognition.onstart = () => micBtn.classList.replace('mic-off', 'mic-on');
     recognition.onend = () => micBtn.classList.replace('mic-on', 'mic-off');
     recognition.onresult = (e) => saveToInbox(e.results[0][0].transcript);
 } else { micBtn.style.display = 'none'; }
-function toggleInput() { const area = document.getElementById('input-area'); area.style.display = area.style.display === 'none' ? 'flex' : 'none'; if(area.style.display === 'flex') document.getElementById('manual-input').focus(); }
+
+function toggleInput() {
+    const area = document.getElementById('input-area');
+    area.style.display = area.style.display === 'none' ? 'flex' : 'none';
+    if(area.style.display === 'flex') document.getElementById('manual-input').focus();
+}
 function addManualItem() { saveToInbox(document.getElementById('manual-input').value); }
 function handleEnter(e) { if(e.key === 'Enter') addManualItem(); }
+
 function toggleProjectSidebar() { document.getElementById('project-sidebar').classList.toggle('active'); }
-function toggleInboxSidebar() { const inbox = document.getElementById('inbox-sidebar'); const openBtn = document.getElementById('open-inbox-btn'); if (inbox.style.display === 'none') { inbox.style.display = 'flex'; openBtn.style.display = 'none'; } else { inbox.style.display = 'none'; openBtn.style.display = 'block'; } }
-function renderInbox() {
-    const ul = document.getElementById('idea-ul'); ul.innerHTML = '';
-    if(inboxData.length === 0) document.getElementById('empty-state').style.display = 'block';
-    else { document.getElementById('empty-state').style.display = 'none'; inboxData.forEach(item => { const li = document.createElement('li'); li.innerHTML = `<span>${item.text}</span><button class="delete-btn" onclick="deleteItem(${item.id})"><i class="fa-solid fa-trash"></i></button>`; ul.appendChild(li); }); }
+function toggleInboxSidebar() {
+    const inbox = document.getElementById('inbox-sidebar');
+    const openBtn = document.getElementById('open-inbox-btn');
+    if (inbox.style.display === 'none') { inbox.style.display = 'flex'; openBtn.style.display = 'none'; }
+    else { inbox.style.display = 'none'; openBtn.style.display = 'block'; }
 }
-window.onload = () => loadProjects();
+
+function renderInbox() {
+    const ul = document.getElementById('idea-ul');
+    ul.innerHTML = '';
+    if(inboxData.length === 0) document.getElementById('empty-state').style.display = 'block';
+    else {
+        document.getElementById('empty-state').style.display = 'none';
+        inboxData.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span>${item.text}</span><button class="delete-btn" onclick="deleteItem(${item.id})"><i class="fa-solid fa-trash"></i></button>`;
+            ul.appendChild(li);
+        });
+    }
+}
+
+// 初期ロード
+window.onload = () => {
+    document.body.classList.add('mode-list'); // Mobile Default
+    loadProjects();
+};
 window.onresize = () => loadData(currentProjectId);
