@@ -230,3 +230,57 @@ body {
     text-overflow: ellipsis;
     max-width: 200px;
 }
+
+/* --- 既存のCSSの修正・追加 --- */
+
+/* ノードの矩形 (rect) */
+.node rect {
+    fill: var(--bg-sidebar);
+    stroke: var(--accent-blue);
+    stroke-width: 2px;
+    rx: 6; ry: 6;
+    /* width, heightはJSで計算するのでCSSからは削除しても良いですが、
+       念のためデフォルトスタイルとして残しておいても害はありません */
+}
+
+/* 選択されたノード */
+.node rect.selected {
+    stroke: var(--accent-red);
+    stroke-width: 3px;
+    fill: #434C5E; /* 少し明るく */
+    filter: drop-shadow(0 0 5px var(--accent-red));
+}
+
+/* テキスト */
+.node text {
+    font: 14px sans-serif;
+    fill: var(--text-main);
+    /* テキスト自体はマウスイベントを無視（下のRectに反応させるため）
+       これが「文字上でのカーソルチラつき」防止に効きます */
+    pointer-events: none; 
+}
+
+/* プロジェクトリストのアイテム */
+.project-item {
+    padding: 12px 20px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.1s; /* アニメーションを短くしてキビキビさせる */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 24px; /* 高さを固定してチラつき防止 */
+}
+
+/* 削除ボタンの挙動安定化 */
+.project-delete-btn {
+    background: none; border: none; color: var(--text-sub);
+    opacity: 0; /* 通常は透明 */
+    cursor: pointer;
+    width: 24px; /* サイズ固定 */
+    text-align: center;
+    transition: opacity 0.2s;
+}
+/* ホバー時のみ表示 */
+.project-item:hover .project-delete-btn { opacity: 1; }
+.project-delete-btn:hover { color: var(--accent-red); }

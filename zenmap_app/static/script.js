@@ -1,28 +1,35 @@
 let currentProjectId = null;
-let currentProjectName = "Inbox"; // プロジェクト名を保持
+let currentProjectName = "Inbox";
 let mapData = {};
 let inboxData = [];
-let selectedNodeId = null; // 現在選択中のノードID
+let selectedNodeId = null;
 
-// --- プロジェクト管理 ---
-async function loadProjects() {
+// --- プロジェクト管理 (修正版) ---
+
+async function loadProjects(shouldSelectId = null) {
     try {
         const res = await fetch('/api/projects');
         const projects = await res.json();
         
         const listEl = document.getElementById('project-list');
-        listEl.innerHTML = '';
+        listEl.innerHTML = ''; // リストをクリア
         
         if (projects.length === 0) {
-            // プロジェクトがない場合
             document.getElementById('inbox-title').innerText = "Inbox";
             return;
         }
 
         projects.forEach(p => {
             const li = document.createElement('li');
-            li.className = `project-item ${p.id == currentProjectId ? 'active' : ''}`;
+            li.className = 'project-item';
+            li.dataset.id = p.id; // IDをデータ属性として持たせる
+            
+            // 現在選択中ならactiveクラス
+            if (p.id == currentProjectId) li.classList.add('active');
+
+            // クリックイベント
             li.onclick = () => switchProject(p.id, p.name);
+            
             li.innerHTML = `
                 <span><i class="fa-solid fa-folder"></i> ${p.name}</span>
                 <button class="project-delete-btn" onclick="deleteProject(event, ${p.id})">
@@ -32,96 +39,160 @@ async function loadProjects() {
             listEl.appendChild(li);
         });
 
-        // 初回またはリロード時の選択復帰
-        if (!currentProjectId && projects.length > 0) {
+        // 指定があればそれを選択、なければ既存維持、それもなければ先頭
+        if (shouldSelectId) {
+            const target = projects.find(p => p.id == shouldSelectId);
+            if(target) switchProject(target.id, target.name);
+        } else if (!currentProjectId && projects.length > 0) {
             switchProject(projects[0].id, projects[0].name);
         } else if (currentProjectId) {
-            // プロジェクト名を更新
+            // 名前だけ更新（念の為）
             const current = projects.find(p => p.id == currentProjectId);
-            if(current) switchProject(current.id, current.name);
+            if(current) {
+                currentProjectName = current.name;
+                document.getElementById('inbox-title').innerText = current.name;
+            } else {
+                // 削除されてた場合などは先頭へ
+                switchProject(projects[0].id, projects[0].name);
+            }
         }
 
     } catch(e) { console.error("Project Load Error:", e); }
 }
 
+// 切り替え処理（リスト再描画を行わない軽量版）
 function switchProject(id, name) {
     currentProjectId = id;
     currentProjectName = name;
     
-    // Inboxのタイトルを変更
+    // UI更新: タイトル
     document.getElementById('inbox-title').innerText = name || "Inbox";
     
+    // UI更新: リストのActiveクラス付け替え
+    const listEl = document.getElementById('project-list');
+    Array.from(listEl.children).forEach(li => {
+        if (li.dataset.id == id) li.classList.add('active');
+        else li.classList.remove('active');
+    });
+
+    // データの読み込み
     loadData(id);
     
-    // リストのハイライト更新
-    const listEl = document.getElementById('project-list');
-    Array.from(listEl.children).forEach(li => li.classList.remove('active'));
-    // 簡易的な再描画待ち（本来はIDで検索してクラス付与がベスト）
-    setTimeout(() => {
-        // 再ロードせずにクラスだけ付け替えたいが、今回はloadProjectsで再描画されるのでお任せ
-    }, 0);
-    loadProjects(); 
+    // スマホ用: サイドバーを閉じる
     document.getElementById('project-sidebar').classList.remove('active');
 }
 
-// ... (createProject, deleteProject は変更なし。そのまま使えますが、loadProjectsを呼んでいるのでOK) ...
 async function createProject() {
     const name = prompt("新しいプロジェクト名:");
     if(!name) return;
-    await fetch('/api/projects', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name: name })
-    });
-    const res = await fetch('/api/projects');
-    const projects = await res.json();
-    const newP = projects[projects.length-1];
-    switchProject(newP.id, newP.name);
-}
-async function deleteProject(event, id) {
-    event.stopPropagation();
-    if(!confirm("削除しますか？")) return;
-    await fetch(`/api/projects?id=${id}`, { method: 'DELETE' });
-    if(currentProjectId == id) currentProjectId = null;
-    loadProjects();
-}
-
-// --- データ読み込み & 保存 ---
-async function loadData(projectId) {
-    if(!projectId) return;
+    
     try {
-        const res = await fetch(`/api/data/${projectId}`);
+        const res = await fetch('/api/projects', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name: name })
+        });
         const data = await res.json();
-        
-        // データ構造の正規化（topicがない場合nameを使うなど）
-        mapData = data.map;
-        if(!mapData.children) mapData.children = [];
-        
-        inboxData = data.inbox;
-        renderInbox();
-        
-        const mapSvg = document.getElementById('mindmap-svg');
-        if(mapSvg.parentElement.style.display !== 'none') {
-            renderMap(mapData);
-        }
+        // 作成したら、そのIDを指定してリロード
+        loadProjects(data.id);
     } catch(e) { console.error(e); }
 }
 
-// マップの手動変更をサーバーに保存
-async function saveMapToServer() {
-    if(!currentProjectId) return;
-    try {
-        await fetch('/api/save_map', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ project_id: currentProjectId, map_data: mapData })
-        });
-        console.log("Map saved.");
-    } catch(e) { console.error("Save failed", e); }
+async function deleteProject(event, id) {
+    event.stopPropagation(); // 親のクリックを阻止
+    if(!confirm("プロジェクトを完全に削除しますか？")) return;
+    
+    await fetch(`/api/projects?id=${id}`, { method: 'DELETE' });
+    
+    // 現在開いているプロジェクトを消した場合はnullにする
+    if(currentProjectId == id) currentProjectId = null;
+    
+    loadProjects();
 }
 
-// --- マインドマップ操作ロジック (Core) ---
 
-// 再帰的にノードを探す関数
+// --- マインドマップ描画 (Dynamic Size対応) ---
+
+function renderMap(data) {
+    const svg = d3.select("#mindmap-svg");
+    svg.selectAll("*").remove();
+    
+    const container = document.getElementById('map-area');
+    // コンテナが非表示なら描画しない（エラー防止）
+    if(container.clientWidth === 0) return;
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    svg.attr("width", width).attr("height", height);
+
+    const g = svg.append("g");
+    svg.call(d3.zoom().on("zoom", (e) => g.attr("transform", e.transform)));
+
+    const root = d3.hierarchy(data);
+    
+    // ツリーのサイズ設定
+    // 横幅は固定せず、ノード間隔で調整するほうが自然ですが、
+    // 今回は簡易的に画面サイズベースで広げます
+    const treeLayout = d3.tree()
+        .size([height - 100, width - 250])
+        .separation((a, b) => (a.parent == b.parent ? 1.5 : 2)); // 兄弟間の距離を少し開ける
+        
+    treeLayout(root);
+
+    // リンク（線）
+    g.selectAll(".link")
+        .data(root.links())
+        .enter().append("path")
+        .attr("class", "link")
+        .attr("d", d3.linkHorizontal()
+            .x(d => d.y + 0) // ノードのpadding分調整が必要だが一旦0
+            .y(d => d.x + 0));
+
+    // ノードグループ作成
+    const node = g.selectAll(".node")
+        .data(root.descendants())
+        .enter().append("g")
+        .attr("class", "node")
+        .attr("transform", d => `translate(${d.y},${d.x})`)
+        .on("click", (e, d) => {
+            e.stopPropagation();
+            selectedNodeId = d.data.id;
+            renderMap(mapData);
+        })
+        .on("dblclick", (e, d) => {
+            e.stopPropagation();
+            editNodeText(d.data.id);
+        });
+
+    // 1. まずテキストを追加（サイズ計測のため）
+    node.append("text")
+        .attr("dy", 5)
+        .attr("x", 10) // 左padding
+        .style("text-anchor", "start")
+        .text(d => d.data.topic)
+        .each(function(d) {
+            // テキストのサイズを測ってデータに保存
+            d.bbox = this.getBBox();
+        });
+
+    // 2. Rectを追加（テキストの下に敷くため insert befor text）
+    node.insert("rect", "text")
+        .attr("x", 0)
+        .attr("y", -15) // テキストの高さに合わせて調整
+        .attr("width", d => d.bbox.width + 20) // 左右padding
+        .attr("height", 30) // 高さは固定気味でOK、あるいは d.bbox.height + 10
+        .attr("class", d => d.data.id === selectedNodeId ? "selected" : "");
+        
+    // リンクの接続位置修正（Rectのサイズが変わったので、線の開始位置はずらすのが理想だが
+    // D3 Treeのデフォルトは中心間接続なので、ここではシンプルに「左端」につなぐ実装のままにします）
+}
+
+
+// --- その他ロジック（ショートカットなど） ---
+// ※ここは前回のコードと同じですが、findParentなどのヘルパー関数が必要です。
+// 　前回のコードから消えていない前提ですが、念の為重要な部分だけ再掲します。
+
+const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
+
 function findNode(node, id) {
     if (node.id === id) return node;
     if (node.children) {
@@ -132,8 +203,6 @@ function findNode(node, id) {
     }
     return null;
 }
-
-// 親ノードを探す関数
 function findParent(root, id) {
     if (!root.children) return null;
     for (let child of root.children) {
@@ -144,285 +213,105 @@ function findParent(root, id) {
     return null;
 }
 
-// ユニークID生成
-const generateId = () => '_' + Math.random().toString(36).substr(2, 9);
-
-// キーボードショートカット
-document.addEventListener('keydown', (e) => {
-    // マップが表示されていない、または入力中は無視
-    if(document.getElementById('map-area').style.display === 'none') return;
-    if(e.target.tagName === 'INPUT') return; 
-
-    if (!selectedNodeId) return;
-
-    const selectedNode = findNode(mapData, selectedNodeId);
-    if (!selectedNode) return;
-
-    // Tab: 子ノード追加
-    if (e.key === 'Tab') {
-        e.preventDefault(); // フォーカス移動防止
-        const newNode = { id: generateId(), topic: "New Idea", children: [] };
-        if (!selectedNode.children) selectedNode.children = [];
-        selectedNode.children.push(newNode);
-        updateMapAndSelect(newNode.id);
-    }
-    
-    // Enter: 兄弟ノード追加 (ルートの場合は子を追加)
-    else if (e.key === 'Enter') {
-        e.preventDefault();
-        const parent = findParent(mapData, selectedNodeId);
-        if (parent) {
-            const newNode = { id: generateId(), topic: "New Idea", children: [] };
-            parent.children.push(newNode);
-            updateMapAndSelect(newNode.id);
-        } else {
-            // ルートを選択中はTabと同じ挙動（子を追加）
-            const newNode = { id: generateId(), topic: "New Idea", children: [] };
-            if (!selectedNode.children) selectedNode.children = [];
-            selectedNode.children.push(newNode);
-            updateMapAndSelect(newNode.id);
-        }
-    }
-
-    // Backspace / Delete: 削除
-    else if (e.key === 'Backspace' || e.key === 'Delete') {
-        const parent = findParent(mapData, selectedNodeId);
-        if (parent) {
-            parent.children = parent.children.filter(n => n.id !== selectedNodeId);
-            selectedNodeId = parent.id; // 親を選択状態に
-            updateMapAndSelect(selectedNodeId);
-        } else {
-            alert("ルートノードは削除できません");
-        }
-    }
-
-    // Space: 編集モード開始
-    else if (e.key === ' ' && !e.repeat) {
-        e.preventDefault();
-        editNodeText(selectedNodeId);
-    }
-});
-
+// データ保存
+async function saveMapToServer() {
+    if(!currentProjectId) return;
+    await fetch('/api/save_map', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ project_id: currentProjectId, map_data: mapData })
+    });
+}
 function updateMapAndSelect(newId) {
     selectedNodeId = newId;
     renderMap(mapData);
-    saveMapToServer(); // 変更を保存
+    saveMapToServer();
 }
-// キーボードショートカット
+function editNodeText(nodeId) {
+    const nodeData = findNode(mapData, nodeId);
+    if(!nodeData) return;
+    const newText = prompt("編集:", nodeData.topic);
+    if(newText !== null && newText.trim() !== "") {
+        nodeData.topic = newText;
+        renderMap(mapData); // ここで再描画すればRectサイズも再計算される
+        saveMapToServer();
+    }
+}
+
+// キーボードイベント (前回と同じものを貼る)
 document.addEventListener('keydown', (e) => {
-    // マップが表示されていない、または入力中は無視
     if(document.getElementById('map-area').style.display === 'none') return;
     if(e.target.tagName === 'INPUT') return; 
-
     if (!selectedNodeId) return;
-
     const selectedNode = findNode(mapData, selectedNodeId);
     if (!selectedNode) return;
 
-    // --- 構造編集 (Tab/Enter/Delete/Space) ---
-
-    // Tab: 子ノード追加
     if (e.key === 'Tab') {
         e.preventDefault();
-        const newNode = { id: generateId(), topic: "New Idea", children: [] };
+        const newNode = { id: generateId(), topic: "New", children: [] };
         if (!selectedNode.children) selectedNode.children = [];
         selectedNode.children.push(newNode);
         updateMapAndSelect(newNode.id);
-    }
-    
-    // Enter: 兄弟ノード追加
-    else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter') {
         e.preventDefault();
         const parent = findParent(mapData, selectedNodeId);
         if (parent) {
-            const newNode = { id: generateId(), topic: "New Idea", children: [] };
+            const newNode = { id: generateId(), topic: "New", children: [] };
             parent.children.push(newNode);
             updateMapAndSelect(newNode.id);
         } else {
-            // ルートの場合
-            const newNode = { id: generateId(), topic: "New Idea", children: [] };
-            if (!selectedNode.children) selectedNode.children = [];
-            selectedNode.children.push(newNode);
-            updateMapAndSelect(newNode.id);
+             const newNode = { id: generateId(), topic: "New", children: [] };
+             if (!selectedNode.children) selectedNode.children = [];
+             selectedNode.children.push(newNode);
+             updateMapAndSelect(newNode.id);
         }
-    }
-
-    // Backspace / Delete: 削除
-    else if (e.key === 'Backspace' || e.key === 'Delete') {
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
         const parent = findParent(mapData, selectedNodeId);
         if (parent) {
             parent.children = parent.children.filter(n => n.id !== selectedNodeId);
             selectedNodeId = parent.id;
             updateMapAndSelect(selectedNodeId);
-        } else {
-            alert("ルートノードは削除できません");
         }
-    }
-
-    // Space: 編集
-    else if (e.key === ' ' && !e.repeat) {
+    } else if (e.key === ' ') {
         e.preventDefault();
         editNodeText(selectedNodeId);
-    }
-
-    // --- 矢印キー移動 (New!) ---
-
-    else if (e.key.startsWith('Arrow')) {
+    } else if (e.key.startsWith('Arrow')) {
         e.preventDefault();
         const parent = findParent(mapData, selectedNodeId);
-
-        // ← (Left): 親へ移動
-        if (e.key === 'ArrowLeft') {
-            if (parent) {
-                selectedNodeId = parent.id;
-                renderMap(mapData);
-            }
-        }
-        // → (Right): 最初の子へ移動
-        else if (e.key === 'ArrowRight') {
-            if (selectedNode.children && selectedNode.children.length > 0) {
-                // 真ん中の子を選ぶと直感的だが、まずは最初の子へ
-                selectedNodeId = selectedNode.children[0].id;
-                renderMap(mapData);
-            }
-        }
-        // ↑ (Up): 前の兄弟へ移動
-        else if (e.key === 'ArrowUp') {
-            if (parent) {
-                const index = parent.children.findIndex(c => c.id === selectedNodeId);
-                if (index > 0) {
-                    selectedNodeId = parent.children[index - 1].id;
-                    renderMap(mapData);
-                }
-            }
-        }
-        // ↓ (Down): 次の兄弟へ移動
-        else if (e.key === 'ArrowDown') {
-            if (parent) {
-                const index = parent.children.findIndex(c => c.id === selectedNodeId);
-                if (index < parent.children.length - 1) {
-                    selectedNodeId = parent.children[index + 1].id;
-                    renderMap(mapData);
-                }
-            }
+        if (e.key === 'ArrowLeft' && parent) {
+            selectedNodeId = parent.id; renderMap(mapData);
+        } else if (e.key === 'ArrowRight' && selectedNode.children?.length) {
+            selectedNodeId = selectedNode.children[0].id; renderMap(mapData);
+        } else if (e.key === 'ArrowUp' && parent) {
+            const idx = parent.children.findIndex(c => c.id === selectedNodeId);
+            if (idx > 0) { selectedNodeId = parent.children[idx - 1].id; renderMap(mapData); }
+        } else if (e.key === 'ArrowDown' && parent) {
+            const idx = parent.children.findIndex(c => c.id === selectedNodeId);
+            if (idx < parent.children.length - 1) { selectedNodeId = parent.children[idx + 1].id; renderMap(mapData); }
         }
     }
 });
 
-// ノード名編集機能
-function editNodeText(nodeId) {
-    const nodeData = findNode(mapData, nodeId);
-    if(!nodeData) return;
-
-    // SVG上のノードの位置を探す
-    const svgNode = d3.selectAll('.node').filter(d => d.data.id === nodeId).node();
-    if(!svgNode) return;
-    
-    // 座標取得
-    const transform = svgNode.getAttribute('transform');
-    const translate = transform.match(/translate\(([^,]+),([^)]+)\)/);
-    const x = parseFloat(translate[1]);
-    const y = parseFloat(translate[2]);
-
-    // 入力ボックスを生成して重ねる
-    let input = document.getElementById('node-editor');
-    if(!input) {
-        input = document.createElement('input');
-        input.id = 'node-editor';
-        document.getElementById('map-area').appendChild(input);
-    }
-
-    // ズーム倍率などを考慮して位置合わせ（簡易実装）
-    // ※D3のズーム状態を取得して計算するのは複雑なので、
-    // 今回はシンプルに「画面中央付近のプロンプト」でも良いが、
-    // 頑張ってCSS Overlayで実装します。
-    
-    // 一旦、シンプルに標準の prompt を使います（スマホでも安定するため）
-    // 入力ボックスでのリッチな編集は、D3の座標変換が複雑なため次回以降の課題とします
-    const newText = prompt("アイデアを編集:", nodeData.topic);
-    if(newText !== null && newText.trim() !== "") {
-        nodeData.topic = newText;
-        updateMapAndSelect(nodeId);
-    }
+// Load Data
+async function loadData(projectId) {
+    if(!projectId) return;
+    try {
+        const res = await fetch(`/api/data/${projectId}`);
+        const data = await res.json();
+        mapData = data.map;
+        if(!mapData.children) mapData.children = [];
+        inboxData = data.inbox;
+        renderInbox();
+        
+        // Mapが可視状態なら描画
+        const mapArea = document.getElementById('map-area');
+        // display: none でない、かつ親要素(main)が表示されているかチェック
+        if(window.getComputedStyle(mapArea).display !== 'none') {
+             renderMap(mapData);
+        }
+    } catch(e) { console.error(e); }
 }
 
-
-// --- 描画 (D3.js) ---
-function renderMap(data) {
-    const svg = d3.select("#mindmap-svg");
-    svg.selectAll("*").remove(); // クリア
-    
-    const container = document.getElementById('map-area');
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    svg.attr("width", width).attr("height", height);
-
-    const g = svg.append("g");
-    
-    // ズーム機能
-    const zoom = d3.zoom().on("zoom", (e) => g.attr("transform", e.transform));
-    svg.call(zoom);
-
-    // データ階層化
-    const root = d3.hierarchy(data);
-    const treeLayout = d3.tree().size([height - 100, width - 300]); // 少し幅に余裕を
-    treeLayout(root);
-
-    // リンク描画
-    g.selectAll(".link")
-        .data(root.links())
-        .enter().append("path")
-        .attr("class", "link")
-        .attr("d", d3.linkHorizontal().x(d => d.y + 100).y(d => d.x + 50));
-
-    // ノード描画
-    const node = g.selectAll(".node")
-        .data(root.descendants())
-        .enter().append("g")
-        .attr("class", "node")
-        .attr("transform", d => `translate(${d.y + 100},${d.x + 50})`)
-        .on("click", (event, d) => {
-            // クリックで選択
-            event.stopPropagation(); // 背景クリックと区別
-            selectedNodeId = d.data.id;
-            renderMap(mapData); // 再描画してスタイル適用
-        })
-        .on("dblclick", (event, d) => {
-            // ダブルクリックで編集
-            event.stopPropagation();
-            editNodeText(d.data.id);
-        });
-
-    // ノードの四角形
-    node.append("rect")
-        .attr("width", 140) // 少し広く
-        .attr("height", 40)
-        .attr("y", -20)
-        .attr("x", 0)
-        .attr("class", d => d.data.id === selectedNodeId ? "selected" : ""); // 選択クラス
-
-    // テキスト
-    node.append("text")
-        .attr("dy", 5)
-        .attr("x", 10)
-        .text(d => d.data.topic)
-        .style("pointer-events", "none"); // テキスト上のクリックもノードクリック扱いにする
-}
-
-// 背景クリックで選択解除
-document.getElementById('map-area').addEventListener('click', () => {
-    // selectedNodeId = null; 
-    // renderMap(mapData);
-    // 好みによりますが、解除しないほうが連続操作しやすいのでコメントアウト
-});
-
-
-// --- その他の機能（Inboxなど）は既存維持 ---
-// (saveToInbox, deleteItem, organizeWithAI, sortable, speechなどは
-//  前回のコードのまま使えますが、ここではスペースの都合上省略します。
-//  `loadData`などは上で書き換えたものを使ってください)
-
-// --- 必須の既存関数群 (コピペ用) ---
+// 共通パーツ
 async function saveToInbox(text) {
     if(!currentProjectId) return alert("プロジェクトを選択してください");
     await fetch('/api/inbox', {
@@ -497,6 +386,5 @@ function renderInbox() {
         });
     }
 }
-
-window.onload = loadProjects;
+window.onload = () => loadProjects();
 window.onresize = () => loadData(currentProjectId);
