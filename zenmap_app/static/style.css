@@ -1,481 +1,207 @@
 :root {
     --bg-dark: #2E3440;
-    --bg-sidebar: #3B4252;
-    --bg-project: #282d38; /* さらに暗い色 */
+    --bg-panel: #3B4252;
+    --bg-sidebar: #434C5E;
     --text-main: #ECEFF4;
     --text-sub: #D8DEE9;
     --accent-blue: #88C0D0;
     --accent-red: #BF616A;
+    --border-color: #4C566A;
 }
 
-body {
-    margin: 0;
-    font-family: 'Inter', sans-serif;
+* { box-sizing: border-box; }
+
+body, html {
+    margin: 0; padding: 0;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
     background-color: var(--bg-dark);
     color: var(--text-main);
-    overflow: hidden;
-    height: 100vh;
+    height: 100%;
+    overflow: hidden; /* 全画面アプリ化 */
 }
 
+/* レイアウトコンテナ */
 #layout-container {
     display: flex;
-    height: 100%;
-    width: 100%;
+    height: 100vh;
+    width: 100vw;
 }
 
-/* --- Column 1: Project Sidebar --- */
+/* --- 左サイドバー (プロジェクト) --- */
 #project-sidebar {
     width: 250px;
-    background-color: var(--bg-project);
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid rgba(0,0,0,0.2);
-    transition: transform 0.3s ease, width 0.3s ease;
-    flex-shrink: 0;
-    z-index: 30;
-}
-
-.sidebar-header {
-    padding: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.sidebar-header h3 { margin: 0; font-size: 16px; color: var(--text-sub); }
-
-#project-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-grow: 1;
-    overflow-y: auto;
-}
-
-.project-item {
-    padding: 12px 20px;
-    cursor: pointer;
-    border-left: 3px solid transparent;
-    transition: background 0.2s;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.project-item:hover { background-color: rgba(255,255,255,0.05); }
-.project-item.active {
-    background-color: rgba(136, 192, 208, 0.1);
-    border-left-color: var(--accent-blue);
-    font-weight: bold;
-    color: var(--accent-blue);
-}
-
-.project-delete-btn {
-    background: none; border: none; color: var(--text-sub); opacity: 0; cursor: pointer;
-}
-.project-item:hover .project-delete-btn { opacity: 1; }
-.project-delete-btn:hover { color: var(--accent-red); }
-
-.new-project-btn {
-    background: transparent;
-    border: 1px dashed var(--text-sub);
-    color: var(--text-sub);
-    padding: 10px;
-    margin: 20px;
-    border-radius: 6px;
-    cursor: pointer;
-}
-.new-project-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
-
-/* --- Column 2: Inbox Sidebar --- */
-#inbox-sidebar {
-    width: 380px;
     background-color: var(--bg-sidebar);
     display: flex;
     flex-direction: column;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
-    position: relative;
-    z-index: 20;
-    transition: margin-left 0.3s ease;
+    border-right: 1px solid var(--border-color);
+    transition: transform 0.3s ease;
+    z-index: 50;
 }
 
 .panel-header {
-    padding: 15px 20px;
+    padding: 15px;
+    background-color: rgba(0,0,0,0.1);
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: space-between;
-    background: rgba(0,0,0,0.1);
+}
+.panel-header h2 { margin: 0; font-size: 18px; }
+
+#project-list {
+    list-style: none; padding: 0; margin: 0;
+    flex: 1; overflow-y: auto;
 }
 
-#input-area { padding: 10px 20px; display: flex; gap: 5px; }
-#manual-input { flex-grow: 1; padding: 8px; border: none; border-radius: 4px; }
-
-#inbox-container {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 20px;
-    padding-bottom: 160px; /* Footer space */
-}
-
-#idea-ul { list-style: none; padding: 0; margin: 0; }
-#idea-ul li {
-    background: rgba(255,255,255,0.05);
-    margin-bottom: 8px;
-    padding: 12px;
-    border-radius: 6px;
-    border-left: 4px solid var(--accent-blue);
-    display: flex;
-    justify-content: space-between;
-    cursor: grab;
-}
-
-/* Footer (Big Mic) - Design Kept */
-#control-footer {
-    position: absolute;
-    bottom: 0; width: 100%; height: 140px;
-    background: linear-gradient(to top, var(--bg-sidebar) 80%, transparent);
-    display: flex; justify-content: center; align-items: flex-end;
-    padding-bottom: 20px; pointer-events: none;
-}
-
-.mic-wrapper { pointer-events: auto; position: relative; z-index: 25; }
-#mic-btn {
-    width: 100px; height: 100px; border-radius: 50%; border: none; font-size: 40px;
-    cursor: pointer; box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-    display: flex; align-items: center; justify-content: center;
-}
-.mic-off { background-color: var(--text-main); color: var(--bg-dark); }
-.mic-on { background-color: var(--accent-red); color: white; animation: pulse 1.5s infinite; }
-
-#ai-btn {
-    pointer-events: auto; position: absolute; bottom: 30px; right: 20px;
-    width: 60px; height: 60px; border-radius: 50%; border: none;
-    background-color: var(--accent-blue); color: #2E3440;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 24px;
-}
-
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(191, 97, 106, 0.7); }
-    70% { box-shadow: 0 0 0 20px rgba(191, 97, 106, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(191, 97, 106, 0); }
-}
-
-/* --- Column 3: Map Area --- */
-#map-area {
-    flex-grow: 1;
-    position: relative;
-    background-color: var(--bg-dark);
-    overflow: hidden;
-}
-#open-inbox-btn {
-    position: absolute; top: 20px; left: 20px;
-    z-index: 10; background: var(--bg-sidebar); border: none;
-    padding: 10px; border-radius: 6px; cursor: pointer; color: var(--text-main);
-}
-.node rect { fill: var(--bg-sidebar); stroke: var(--accent-blue); stroke-width: 2px; rx: 6; ry: 6; }
-.node text { font: 14px sans-serif; fill: var(--text-main); }
-.link { fill: none; stroke: #4C566A; stroke-width: 1.5px; }
-
-/* --- Mobile / Responsive & Toggles --- */
-.mobile-menu-btn, .close-btn-mobile { display: none; } /* Default PC */
-.collapse-btn-pc { background: none; border: none; color: var(--text-sub); cursor: pointer; }
-
-@media (max-width: 768px) {
-    /* Mobile: Project Sidebar becomes a drawer */
-    #project-sidebar {
-        position: fixed;
-        top: 0; left: -100%; /* Hidden */
-        height: 100%; width: 80%;
-        box-shadow: 5px 0 15px rgba(0,0,0,0.5);
-    }
-    #project-sidebar.active { left: 0; }
-    
-    .mobile-menu-btn { display: block; background: none; border: none; color: white; font-size: 20px; }
-    .close-btn-mobile { display: block; background: none; border: none; color: white; font-size: 20px; }
-    .collapse-btn-pc { display: none; }
-
-    /* Mobile: Inbox is full width */
-    #inbox-sidebar { width: 100%; }
-    
-    /* Mobile: Map is hidden by default */
-    #map-area { display: none; }
-}
-
-/* （既存のCSSの最後に以下を追加してください） */
-
-/* 選択されたノードの強調表示 */
-.node rect.selected {
-    stroke: var(--accent-red); /* 赤っぽい色で強調 */
-    stroke-width: 4px;
-    filter: drop-shadow(0 0 5px var(--accent-red));
-}
-
-/* ノード編集中に表示する入力ボックス */
-#node-editor {
-    position: absolute;
-    z-index: 100;
-    font-size: 14px;
-    padding: 5px;
-    border-radius: 4px;
-    border: 2px solid var(--accent-blue);
-    outline: none;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    display: none; /* 通常は隠す */
-}
-
-/* Inboxのヘッダータイトルを動的に変更するので、少しスタイル調整 */
-#inbox-sidebar .panel-header h2 {
-    font-size: 18px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 200px;
-}
-
-/* --- 既存のCSSの修正・追加 --- */
-
-/* ノードの矩形 (rect) */
-.node rect {
-    fill: var(--bg-sidebar);
-    stroke: var(--accent-blue);
-    stroke-width: 2px;
-    rx: 6; ry: 6;
-    /* width, heightはJSで計算するのでCSSからは削除しても良いですが、
-       念のためデフォルトスタイルとして残しておいても害はありません */
-}
-
-/* 選択されたノード */
-.node rect.selected {
-    stroke: var(--accent-red);
-    stroke-width: 3px;
-    fill: #434C5E; /* 少し明るく */
-    filter: drop-shadow(0 0 5px var(--accent-red));
-}
-
-/* テキスト */
-.node text {
-    font: 14px sans-serif;
-    fill: var(--text-main);
-    /* テキスト自体はマウスイベントを無視（下のRectに反応させるため）
-       これが「文字上でのカーソルチラつき」防止に効きます */
-    pointer-events: none; 
-}
-
-/* プロジェクトリストのアイテム */
 .project-item {
     padding: 12px 20px;
     cursor: pointer;
     border-left: 3px solid transparent;
-    transition: background 0.1s; /* アニメーションを短くしてキビキビさせる */
+    transition: background 0.1s;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    height: 24px; /* 高さを固定してチラつき防止 */
+    height: 40px;
+}
+.project-item:hover { background-color: rgba(255,255,255,0.05); }
+.project-item.active {
+    background-color: rgba(0,0,0,0.2);
+    border-left-color: var(--accent-blue);
 }
 
-/* 削除ボタンの挙動安定化 */
-.project-delete-btn {
-    background: none; border: none; color: var(--text-sub);
-    opacity: 0; /* 通常は透明 */
-    cursor: pointer;
-    width: 24px; /* サイズ固定 */
-    text-align: center;
-    transition: opacity 0.2s;
-}
-/* ホバー時のみ表示 */
-.project-item:hover .project-delete-btn { opacity: 1; }
-.project-delete-btn:hover { color: var(--accent-red); }
-
-/* --- CSSの最後に追加 --- */
-
-.history-controls {
-    position: absolute;
-    bottom: 30px;
-    left: 20px;
-    display: flex;
-    gap: 15px;
-    z-index: 25;
-}
-
-.history-btn {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    border: none;
-    background-color: var(--bg-panel);
-    color: var(--text-main);
-    font-size: 18px;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    transition: opacity 0.2s, transform 0.1s;
-    opacity: 0.3; /* 初期状態は無効っぽく */
-}
-
-.history-btn:active {
-    transform: scale(0.9);
-}
-
-/* モバイル対応修正 */
-@media (max-width: 768px) {
-    /* スマホでは履歴ボタンが邪魔にならないよう少し小さく配置 */
-    .history-btn {
-        width: 40px; height: 40px; font-size: 16px;
-    }
-    .history-controls {
-        bottom: 30px; left: 15px; gap: 10px;
-    }
-}
-
-/* --- CSSの最後に追加・修正 --- */
-
-/* スマホ用ビュー切り替えタブ (PCでは隠す) */
-#mobile-view-toggle {
-    display: none; /* PCデフォルト */
-    padding: 10px 20px;
-    gap: 10px;
-}
-
-#mobile-view-toggle button {
-    flex: 1;
-    padding: 8px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--accent-blue);
-    color: var(--text-sub);
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-#mobile-view-toggle button.active {
-    background: var(--accent-blue);
-    color: var(--bg-dark);
-    font-weight: bold;
-}
-
-/* プロジェクト編集ボタン */
-.project-edit-btn {
+.project-actions { display: flex; gap: 5px; }
+.project-item button {
     background: none; border: none; color: var(--text-sub);
     opacity: 0; cursor: pointer; width: 24px; transition: opacity 0.2s;
 }
-.project-item:hover .project-edit-btn { opacity: 1; }
-.project-edit-btn:hover { color: var(--accent-blue); }
+.project-item:hover button { opacity: 1; }
+.project-item button:hover { color: var(--accent-blue); }
+.project-delete-btn:hover { color: var(--accent-red) !important; }
+
+#add-project-btn {
+    padding: 15px; background: none; border: none;
+    color: var(--text-sub); border-top: 1px solid var(--border-color);
+    cursor: pointer; text-align: left;
+}
+#add-project-btn:hover { color: var(--accent-blue); }
 
 
-/* --- Mobile Responsive (重要修正) --- */
-@media (max-width: 768px) {
-    #mobile-view-toggle {
-        display: flex; /* スマホで表示 */
-    }
-
-    /* デフォルト状態 (リスト表示モード) */
-    body.mode-list #inbox-sidebar { display: flex; width: 100%; }
-    body.mode-list #map-area { display: none; }
-
-    /* マップ表示モード */
-    body.mode-map #inbox-sidebar { display: none; }
-    body.mode-map #map-area { 
-        display: block; 
-        width: 100%; height: 100%; 
-    }
-    
-    /* マップモードでもフッター（マイクなど）をマップの上に浮かせたい場合 */
-    /* 今回はシンプルに「見るだけ」にするため、マップモードではフッターは隠れます */
+/* --- 中央サイドバー (Inbox) --- */
+#inbox-sidebar {
+    width: 300px;
+    background-color: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    z-index: 40;
+    transition: width 0.3s ease, transform 0.3s ease;
 }
 
-/* --- static/style.css の末尾に追加 --- */
+/* スマホ用ビュー切替タブ */
+#mobile-view-toggle {
+    display: none; /* PCでは非表示 */
+    padding: 10px 20px; gap: 10px;
+}
+#mobile-view-toggle button {
+    flex: 1; padding: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--accent-blue);
+    color: var(--text-sub); border-radius: 4px; cursor: pointer;
+}
+#mobile-view-toggle button.active {
+    background: var(--accent-blue); color: var(--bg-dark); font-weight: bold;
+}
 
-/* 全画面ボタンのスタイル */
-#fullscreen-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 100; /* マップより手前に */
-    width: 40px;
-    height: 40px;
+.input-wrapper { padding: 10px 15px; text-align: right; }
+.icon-btn {
+    background: none; border: none; color: var(--text-sub);
+    cursor: pointer; font-size: 16px;
+}
+
+#input-area {
+    display: flex; padding: 0 15px 10px; gap: 5px;
+}
+#manual-input {
+    flex: 1; padding: 8px; border-radius: 4px; border: none;
+    background: var(--bg-dark); color: white;
+}
+#input-area button {
+    padding: 8px 12px; background: var(--accent-blue); border: none;
+    border-radius: 4px; cursor: pointer; color: var(--bg-dark);
+}
+
+.idea-list {
+    list-style: none; padding: 0; margin: 0;
+    flex: 1; overflow-y: auto; padding-bottom: 20px;
+}
+.idea-list li {
+    background: rgba(255,255,255,0.05);
+    margin: 5px 15px; padding: 10px; border-radius: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: grab;
+}
+.delete-btn {
+    background: none; border: none; color: #666; cursor: pointer;
+}
+.delete-btn:hover { color: var(--accent-red); }
+
+#empty-state {
+    text-align: center; color: #666; margin-top: 50px;
+    display: none;
+}
+#empty-state i { font-size: 40px; margin-bottom: 10px; }
+
+
+/* --- アクションボタンエリア (Inbox下部) --- */
+.inbox-actions-container {
+    margin-top: auto; /* 一番下へ */
+    padding: 20px 10px;
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+}
+
+#mic-btn, #ai-btn {
+    width: 60px; height: 60px;
     border-radius: 50%;
     border: none;
-    background: var(--bg-panel);
-    color: var(--text-main);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    font-size: 24px;
     cursor: pointer;
-    font-size: 18px;
-    transition: all 0.2s;
-}
-#fullscreen-btn:hover {
-    background: var(--accent-blue);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     color: white;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s, box-shadow 0.3s;
+}
+#mic-btn:hover, #ai-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+#mic-btn:active, #ai-btn:active { transform: scale(0.95); }
+
+#mic-btn.mic-off { background-color: var(--accent-blue); }
+#mic-btn.mic-on { background-color: var(--accent-red); animation: pulse 1.5s infinite; }
+#ai-btn { background: linear-gradient(135deg, var(--accent-blue), #8FBCBB); }
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(191, 97, 106, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(191, 97, 106, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(191, 97, 106, 0); }
 }
 
-/* ★全画面モード時のスタイル */
-/* bodyにこのクラスがつくと、サイドバーが消えてマップが広がる */
-body.fullscreen-mode #project-sidebar,
-body.fullscreen-mode #inbox-sidebar {
-    display: none !important; /* 強制的に消す */
+
+/* --- 右メインエリア (Map) --- */
+#map-area {
+    flex: 1;
+    position: relative;
+    background-color: var(--bg-dark);
+    overflow: hidden;
 }
 
-/* 全画面時はInboxを開くボタンも邪魔なので消す */
-body.fullscreen-mode #open-inbox-btn {
-    display: none !important;
-}
-
-/* スマホではこのボタン自体を隠す（スマホは元々全画面に近いので） */
-@media (max-width: 768px) {
-    #fullscreen-btn { display: none; }
-}
-
-/* --- static/style.css への追記・修正 --- */
-
-/* 1. Inbox下のアクションエリア */
-.inbox-actions {
-    margin-top: auto; /* サイドバーの一番下に押し下げる */
-    padding: 15px;
-    display: flex;
-    gap: 10px;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    background: rgba(0,0,0,0.2);
-}
-
-.action-btn-large {
-    flex: 1; /* 横幅いっぱいに広げる */
-    height: 44px;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: white;
-    transition: all 0.2s;
-}
-
-/* マイクボタン */
-#mic-btn {
-    background: #4C566A;
-}
-#mic-btn.mic-on {
-    background: var(--accent-red);
-    animation: pulse 1.5s infinite;
-}
-
-/* AIボタン */
-#ai-btn {
-    background: var(--accent-blue);
-    font-weight: bold;
-}
-#ai-btn:hover {
-    filter: brightness(1.1);
-    box-shadow: 0 4px 10px rgba(94, 129, 172, 0.4);
-}
-
-/* 2. マップエリア右上のコントロール群 */
+/* マップ操作コントロール (右上) */
 .map-controls {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 20px; right: 20px;
     z-index: 100;
-    display: flex;
-    gap: 15px;
-    align-items: center;
+    display: flex; gap: 15px; align-items: center;
 }
 
 .history-group {
@@ -485,51 +211,101 @@ body.fullscreen-mode #open-inbox-btn {
     padding: 2px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
-
 .history-group button {
-    background: transparent;
-    border: none;
-    color: var(--text-main);
-    width: 36px;
-    height: 36px;
-    cursor: pointer;
-    border-radius: 6px;
-    font-size: 14px;
+    background: transparent; border: none;
+    color: var(--text-main); width: 36px; height: 36px;
+    cursor: pointer; border-radius: 6px; font-size: 14px;
 }
-.history-group button:hover {
-    background: rgba(255,255,255,0.1);
-}
+.history-group button:hover { background: rgba(255,255,255,0.1); }
 
-/* 全画面ボタン（以前のスタイルを少し調整） */
 #fullscreen-btn {
-    position: static; /* absolute解除（親が管理するため） */
-    width: 40px;
-    height: 40px;
-    border-radius: 8px; /* 丸から四角へ統一 */
-    border: none;
-    background: var(--bg-panel);
-    color: var(--text-main);
+    width: 40px; height: 40px;
+    border-radius: 8px; border: none;
+    background: var(--bg-panel); color: var(--text-main);
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    cursor: pointer;
-    font-size: 16px;
+    cursor: pointer; font-size: 16px;
 }
-#fullscreen-btn:hover {
-    background: var(--accent-blue);
-    color: white;
+#fullscreen-btn:hover { background: var(--accent-blue); color: white; }
+
+#open-inbox-btn {
+    position: absolute; top: 20px; left: 20px;
+    z-index: 100;
+    width: 40px; height: 40px;
+    border-radius: 50%; border: none;
+    background: var(--bg-panel); color: var(--text-main);
+    cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* 3. 古いフッター設定の削除/無効化（念の為） */
-#control-footer {
+
+/* --- D3 Mindmap Styles --- */
+.node rect {
+    fill: var(--bg-sidebar);
+    stroke: var(--accent-blue);
+    stroke-width: 2px;
+    rx: 6; ry: 6;
+}
+.node rect.selected {
+    stroke: var(--accent-red);
+    stroke-width: 3px;
+    fill: #4C566A;
+    filter: drop-shadow(0 0 5px var(--accent-red));
+}
+.node text {
+    font: 14px sans-serif;
+    fill: var(--text-main);
+    pointer-events: none;
+}
+.link {
+    fill: none;
+    stroke: #555;
+    stroke-width: 2px;
+}
+
+
+/* --- 全画面モード --- */
+body.fullscreen-mode #project-sidebar,
+body.fullscreen-mode #inbox-sidebar {
     display: none !important;
 }
-#layout-container {
-    height: 100vh; /* 画面いっぱい */
-}
+body.fullscreen-mode #open-inbox-btn { display: none !important; }
 
-/* スマホ対応調整 */
+
+/* --- Mobile Responsive --- */
+.mobile-menu-btn, .close-btn-mobile { display: none; }
+.collapse-btn-pc { display: block; }
+
 @media (max-width: 768px) {
-    .map-controls {
-        top: 10px; right: 10px;
+    #layout-container { position: relative; }
+    
+    #project-sidebar {
+        position: absolute; left: 0; top: 0; bottom: 0;
+        transform: translateX(-100%);
+        width: 80%; max-width: 300px;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.5);
     }
-    #fullscreen-btn { display: none; } /* スマホでは全画面ボタン不要 */
+    #project-sidebar.active { transform: translateX(0); }
+    
+    .mobile-menu-btn, .close-btn-mobile {
+        display: block; background: none; border: none;
+        color: var(--text-main); font-size: 18px; cursor: pointer;
+    }
+    .collapse-btn-pc { display: none; }
+    
+    /* View Toggle */
+    #mobile-view-toggle { display: flex; }
+
+    /* Mode List */
+    body.mode-list #inbox-sidebar { width: 100%; display: flex; }
+    body.mode-list #map-area { display: none; }
+
+    /* Mode Map */
+    body.mode-map #inbox-sidebar { display: none; }
+    body.mode-map #map-area { display: block; width: 100%; }
+
+    /* Mobile Controls */
+    .map-controls { top: 10px; right: 10px; }
+    #fullscreen-btn { display: none; } /* スマホは不要 */
+    
+    /* Input Area */
+    #input-area { padding-bottom: 20px; }
 }

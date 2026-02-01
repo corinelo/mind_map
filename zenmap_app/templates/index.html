@@ -35,7 +35,9 @@
                 <button onclick="toggleProjectSidebar()" class="mobile-menu-btn">
                     <i class="fa-solid fa-bars"></i>
                 </button>
+                
                 <h2 id="inbox-title">Inbox</h2>
+                
                 <button onclick="toggleInboxSidebar()" class="collapse-btn-pc">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
@@ -65,12 +67,13 @@
                 <p>アイデアを追加</p>
             </div>
 
-            <div class="inbox-actions">
-                <button id="mic-btn" class="mic-off action-btn-large">
+            <div class="inbox-actions-container">
+                <button id="mic-btn" class="mic-off">
                     <i class="fa-solid fa-microphone"></i>
                 </button>
-                <button id="ai-btn" onclick="organizeWithAI()" class="action-btn-large">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> 整理
+                
+                <button id="ai-btn" onclick="organizeWithAI()">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
                 </button>
             </div>
         </aside>
