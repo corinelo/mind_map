@@ -181,6 +181,28 @@ def ai_organize():
         print(f"AI Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# 4. マップの手動保存 API (新規追加)
+@app.route('/api/save_map', methods=['POST'])
+def save_map():
+    data = request.json
+    project_id = data.get('project_id')
+    map_content = data.get('map_data')
+
+    if not project_id or not map_content:
+        return jsonify({"status": "error", "message": "Missing data"}), 400
+
+    try:
+        # 最新のマップとして保存
+        new_record = MindMap(content=json.dumps(map_content), project_id=project_id)
+        db.session.add(new_record)
+        db.session.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# （これより下の ai_organize や main ブロックは変更なし）
+# ...
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
 

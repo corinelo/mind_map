@@ -199,3 +199,34 @@ body {
     /* Mobile: Map is hidden by default */
     #map-area { display: none; }
 }
+
+/* （既存のCSSの最後に以下を追加してください） */
+
+/* 選択されたノードの強調表示 */
+.node rect.selected {
+    stroke: var(--accent-red); /* 赤っぽい色で強調 */
+    stroke-width: 4px;
+    filter: drop-shadow(0 0 5px var(--accent-red));
+}
+
+/* ノード編集中に表示する入力ボックス */
+#node-editor {
+    position: absolute;
+    z-index: 100;
+    font-size: 14px;
+    padding: 5px;
+    border-radius: 4px;
+    border: 2px solid var(--accent-blue);
+    outline: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    display: none; /* 通常は隠す */
+}
+
+/* Inboxのヘッダータイトルを動的に変更するので、少しスタイル調整 */
+#inbox-sidebar .panel-header h2 {
+    font-size: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
