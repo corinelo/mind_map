@@ -5,31 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ZenMap Sync</title>
     
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://placehold.co/192x192/3B4252/88C0D0?text=ZM">
-
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
 
     <div id="layout-container">
         
         <nav id="project-sidebar" class="sidebar">
-            <div class="sidebar-header">
-                <h3>Projects</h3>
-                <button onclick="toggleProjectSidebar()" class="close-btn-mobile"><i class="fa-solid fa-times"></i></button>
+            <div class="panel-header">
+                <h2>Projects</h2>
+                <button onclick="toggleProjectSidebar()" class="close-btn-mobile">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
-            
             <ul id="project-list">
                 </ul>
-
-            <button onclick="createProject()" class="new-project-btn">
-                <i class="fa-solid fa-plus"></i> 新規作成
+            <button id="add-project-btn" onclick="createProject()">
+                <i class="fa-solid fa-plus"></i> 新規プロジェクト
             </button>
         </nav>
 
@@ -39,60 +36,70 @@
                     <i class="fa-solid fa-bars"></i>
                 </button>
                 
-                <h2>Inbox</h2>
-
                 <h2 id="inbox-title">Inbox</h2>
-
+                
                 <button onclick="toggleInboxSidebar()" class="collapse-btn-pc">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
             </div>
 
+            <div id="mobile-view-toggle">
+                <button id="tab-list" class="active" onclick="switchMobileView('list')">リスト</button>
+                <button id="tab-map" onclick="switchMobileView('map')">マップ</button>
+            </div>
+
             <div class="input-wrapper">
-                <button onclick="toggleInput()" class="icon-btn"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="toggleInput()" class="icon-btn">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
             </div>
-            <div id="input-area" style="display:none;">
+
+            <div id="input-area" style="display: none;">
                 <input type="text" id="manual-input" placeholder="アイデアを入力..." onkeypress="handleEnter(event)">
-                <button onclick="addManualItem()"><i class="fa-solid fa-plus"></i></button>
+                <button onclick="addManualItem()">追加</button>
             </div>
 
-            <div id="inbox-container">
-                <ul id="idea-ul"></ul>
-                <div id="empty-state" style="display:none;">
-                    <p>No ideas yet.</p>
-                </div>
+            <ul id="idea-ul" class="idea-list">
+                </ul>
+
+            <div id="empty-state">
+                <i class="fa-regular fa-lightbulb"></i>
+                <p>アイデアを追加するか<br>マイクで話しかけてください</p>
             </div>
-
-        <div id="control-footer">
-    
-    <div class="history-controls">
-        <button id="undo-btn" onclick="undo()" class="history-btn"><i class="fa-solid fa-rotate-left"></i></button>
-        <button id="redo-btn" onclick="redo()" class="history-btn"><i class="fa-solid fa-rotate-right"></i></button>
-    </div>
-
-    <div class="mic-wrapper">
-        <button id="mic-btn" class="mic-off">
-            <i class="fa-solid fa-microphone"></i>
-        </button>
-    </div>
-    
-    <button id="ai-btn" onclick="organizeWithAI()">
-        <i class="fa-solid fa-wand-magic-sparkles"></i>
-    </button>
-</div>
         </aside>
 
         <main id="map-area">
             <button id="open-inbox-btn" onclick="toggleInboxSidebar()" style="display:none;">
                 <i class="fa-solid fa-list"></i>
             </button>
+            
             <svg id="mindmap-svg"></svg>
         </main>
 
     </div>
 
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <div id="control-footer">
+        
+        <div class="history-controls">
+            <button id="undo-btn" onclick="undo()" class="history-btn">
+                <i class="fa-solid fa-rotate-left"></i>
+            </button>
+            <button id="redo-btn" onclick="redo()" class="history-btn">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+
+        <div class="mic-wrapper">
+            <button id="mic-btn" class="mic-off">
+                <i class="fa-solid fa-microphone"></i>
+            </button>
+        </div>
+        
+        <button id="ai-btn" onclick="organizeWithAI()">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+        </button>
+    </div>
+
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
-
 </html>
